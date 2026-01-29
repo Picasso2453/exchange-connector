@@ -1,5 +1,7 @@
 using System.CommandLine;
 using xws.Core.Output;
+using xws.Core.WebSocket;
+using xws.Exchanges.Hyperliquid;
 
 var root = new RootCommand("xws CLI");
 
@@ -19,9 +21,21 @@ var tradesSymbolOption = new Option<string>("--symbol", "Native coin symbol")
     IsRequired = true
 };
 tradesCommand.AddOption(tradesSymbolOption);
-tradesCommand.SetHandler((string symbol) =>
+tradesCommand.SetHandler(async (string symbol) =>
 {
-    Logger.Info($"hl subscribe trades: not implemented (symbol={symbol})");
+    using var cts = new CancellationTokenSource();
+    Console.CancelKeyPress += (_, e) =>
+    {
+        e.Cancel = true;
+        cts.Cancel();
+    };
+
+    var subscription = HyperliquidWs.BuildTradesSubscription(symbol);
+    var writer = new JsonlWriter();
+    var runner = new WebSocketRunner(writer);
+
+    var exitCode = await runner.RunAsync(new Uri(HyperliquidWs.MainnetUrl), new[] { subscription }, cts.Token);
+    Environment.ExitCode = exitCode;
 }, tradesSymbolOption);
 
 var positionsCommand = new Command("positions", "Subscribe to positions/account stream");
