@@ -93,3 +93,9 @@ dotnet publish src/xws -c Release -r linux-x64 --self-contained false -o out/lin
 ## Compatibility
 
 Validated by CI on Windows and Ubuntu. The CLI should also run on Linux without changes.
+
+## Milestone 1
+
+- Raw JSONL streaming CLI with Hyperliquid adapter.
+- Reconnect/backoff with retry cap = 3 and resubscribe.
+- Discovery via `hl symbols`.
