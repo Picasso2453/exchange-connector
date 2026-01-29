@@ -134,6 +134,11 @@ dotnet publish src/xws -c Release -r linux-x64 --self-contained false -o out/lin
 
 Validated by CI on Windows and Ubuntu. The CLI should also run on Linux without changes.
 
+## Artifacts
+
+Local packaging outputs go to `artifacts/` (ignored by git). Use `scripts/pack.ps1`
+or `scripts/pack.sh` to build, pack, and publish.
+
 ## Milestone 1
 
 - Raw JSONL streaming CLI with Hyperliquid adapter.

@@ -1,0 +1,11 @@
+<Project>
+  <PropertyGroup>
+    <Version>0.3.0</Version>
+    <PackageVersion>0.3.0</PackageVersion>
+    <Authors>exchange-connector</Authors>
+    <Company>exchange-connector</Company>
+    <RepositoryUrl>https://github.com/Picasso2453/exchange-connector</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+</Project>
