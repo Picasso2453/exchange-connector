@@ -4,6 +4,9 @@ set -euo pipefail
 raw_out="$(mktemp)"
 mux_out="$(mktemp)"
 allow_mexc_fail="${XWS_MEXC_ALLOW_FAIL:-}"
+if [ "${XWS_SMOKE_ALLOW_NETFAIL:-}" = "1" ]; then
+  allow_mexc_fail="1"
+fi
 
 cleanup() {
   rm -f "$raw_out" "$mux_out"

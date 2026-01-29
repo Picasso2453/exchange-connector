@@ -77,3 +77,8 @@ dotnet run --project src/xws -- --help
 - Add MEXC spot trades adapter (protobuf parsing) with futures scaffolding.
 - Introduce mux command to run HL + MEXC concurrently with envelope JSONL output.
 - Preserve legacy raw output via `--format raw` on existing HL commands.
+
+## Milestone 2 (Complete)
+- MEXC spot trades adapter with protobuf decoding and offline test.
+- Mux command runs HL + MEXC concurrently with envelope JSONL default.
+- Best-effort mux behavior documented for partial network access.

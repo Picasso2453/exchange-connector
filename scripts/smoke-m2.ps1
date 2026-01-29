@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 
 $rawOut = Join-Path $env:TEMP ("xws_raw_" + [guid]::NewGuid().ToString() + ".txt")
 $muxOut = Join-Path $env:TEMP ("xws_mux_" + [guid]::NewGuid().ToString() + ".txt")
-$allowMexcFail = $env:XWS_MEXC_ALLOW_FAIL -eq "1"
+$allowMexcFail = $env:XWS_MEXC_ALLOW_FAIL -eq "1" -or $env:XWS_SMOKE_ALLOW_NETFAIL -eq "1"
 
 try {
     dotnet run --project src/xws -- hl subscribe trades --symbol SOL --format raw --max-messages 3 --timeout-seconds 30 > $rawOut
