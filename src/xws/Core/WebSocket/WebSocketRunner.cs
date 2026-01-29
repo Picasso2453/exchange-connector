@@ -6,6 +6,8 @@ namespace xws.Core.WebSocket;
 
 public sealed class WebSocketRunner
 {
+    private const int MaxReconnectAttempts = 3;
+    private static readonly TimeSpan BaseBackoff = TimeSpan.FromSeconds(1);
     private readonly IJsonlWriter _writer;
 
     public WebSocketRunner(IJsonlWriter writer)
@@ -15,31 +17,62 @@ public sealed class WebSocketRunner
 
     public async Task<int> RunAsync(Uri uri, IReadOnlyList<string> subscriptions, CancellationToken cancellationToken)
     {
-        try
-        {
-            using var socket = new ClientWebSocket();
-            Logger.Info($"connecting: {uri}");
-            await socket.ConnectAsync(uri, cancellationToken);
-            Logger.Info("connected");
+        var reconnectAttempts = 0;
 
-            foreach (var subscription in subscriptions)
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
             {
-                await SendTextAsync(socket, subscription, cancellationToken);
-                Logger.Info("subscribed");
+                using var socket = new ClientWebSocket();
+                Logger.Info($"connecting: {uri}");
+                await socket.ConnectAsync(uri, cancellationToken);
+                Logger.Info("connected");
+
+                foreach (var subscription in subscriptions)
+                {
+                    await SendTextAsync(socket, subscription, cancellationToken);
+                    Logger.Info("subscribed");
+                }
+
+                reconnectAttempts = 0;
+
+                await ReceiveLoopAsync(socket, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error($"connection error: {ex.Message}");
             }
 
-            await ReceiveLoopAsync(socket, cancellationToken);
-            return 0;
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+
+            reconnectAttempts++;
+            if (reconnectAttempts > MaxReconnectAttempts)
+            {
+                Logger.Error($"reconnect failed after {MaxReconnectAttempts} attempts");
+                return 1;
+            }
+
+            var delay = TimeSpan.FromSeconds(BaseBackoff.TotalSeconds * Math.Pow(2, reconnectAttempts - 1));
+            Logger.Info($"reconnect attempt {reconnectAttempts}/{MaxReconnectAttempts} in {delay.TotalSeconds:0}s");
+
+            try
+            {
+                await Task.Delay(delay, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            Logger.Error($"connection error: {ex.Message}");
-            return 1;
-        }
+
+        return 0;
     }
 
     private async Task ReceiveLoopAsync(ClientWebSocket socket, CancellationToken cancellationToken)
