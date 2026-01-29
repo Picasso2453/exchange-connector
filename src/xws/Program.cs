@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Text.Json;
 using xws.Core.Env;
 using xws.Core.Output;
 using xws.Core.Subscriptions;
@@ -8,6 +9,90 @@ using xws.Exchanges.Hyperliquid;
 var root = new RootCommand("xws CLI");
 
 var hlCommand = new Command("hl", "Hyperliquid adapter");
+
+var muxCommand = new Command("subscribe", "Subscribe to multiple exchanges");
+var muxTradesCommand = new Command("trades", "Mux trades subscriptions");
+var muxSubOption = new Option<string[]>(
+    "--sub",
+    "Subscription spec: <exchange>[.<market>]=SYM1,SYM2 (repeatable)")
+{
+    Arity = ArgumentArity.OneOrMore
+};
+var muxMaxMessagesOption = new Option<int?>("--max-messages", "Stop after N JSONL messages (exit 0)");
+var muxTimeoutSecondsOption = new Option<int?>("--timeout-seconds", "Fail if max messages not reached within T seconds");
+var muxFormatOption = new Option<string>("--format", () => "envelope", "Output format: envelope|raw");
+
+muxTradesCommand.AddOption(muxSubOption);
+muxTradesCommand.AddOption(muxMaxMessagesOption);
+muxTradesCommand.AddOption(muxTimeoutSecondsOption);
+muxTradesCommand.AddOption(muxFormatOption);
+muxTradesCommand.SetHandler((string[] subs, int? maxMessages, int? timeoutSeconds, string format) =>
+{
+    if (!IsValidFormat(format))
+    {
+        Logger.Error("--format must be envelope or raw");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (maxMessages.HasValue && maxMessages.Value <= 0)
+    {
+        Logger.Error("--max-messages must be greater than 0");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+    {
+        Logger.Error("--timeout-seconds must be greater than 0");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+    {
+        Logger.Error("--timeout-seconds requires --max-messages");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    var parsed = new List<ParsedSub>();
+    foreach (var sub in subs)
+    {
+        if (!TryParseSub(sub, out var parsedSub))
+        {
+            Logger.Error($"invalid --sub format: {sub}");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        parsed.Add(parsedSub);
+    }
+
+    var emitted = 0;
+    foreach (var sub in parsed)
+    {
+        if (maxMessages.HasValue && emitted >= maxMessages.Value)
+        {
+            break;
+        }
+
+        if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
+        {
+            var raw = new JsonlWriter();
+            raw.WriteLine($"{{\"status\":\"planned\",\"exchange\":\"{sub.Exchange}\",\"market\":\"{sub.Market}\",\"symbols\":{JsonSerializer.Serialize(sub.Symbols)}}}");
+        }
+        else
+        {
+            var writer = new EnvelopeWriter(sub.Exchange, "trades", sub.Market, sub.Symbols);
+            writer.WriteRawObject(new { status = "planned" });
+        }
+
+        emitted++;
+    }
+}, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
+
+muxCommand.AddCommand(muxTradesCommand);
 
 var hlSymbolsCommand = new Command("symbols", "List available symbols/instruments");
 var symbolsFilterOption = new Option<string?>("--filter", "Filter by substring");
@@ -180,7 +265,9 @@ positionsCommand.SetHandler(async (int? maxMessages, int? timeoutSeconds, string
     {
         var config = HyperliquidConfig.Load();
         var subscription = HyperliquidWs.BuildClearinghouseStateSubscription(user);
-        var writer = new JsonlWriter();
+        IJsonlWriter writer = format == "raw"
+            ? new JsonlWriter()
+            : new EnvelopeWriter("hl", "positions", null, null);
         var registry = new SubscriptionRegistry();
         registry.Add(subscription);
         var runner = new WebSocketRunner(writer, registry);
@@ -207,6 +294,7 @@ hlCommand.AddCommand(hlSymbolsCommand);
 hlCommand.AddCommand(hlSubscribeCommand);
 
 root.AddCommand(hlCommand);
+root.AddCommand(muxCommand);
 
 return await root.InvokeAsync(args);
 
