@@ -1,0 +1,127 @@
+Spec Freeze — Milestone 2 (MEXC proof + multi-exchange + unified envelope)
+Intent (one sentence)
+
+Add MEXC (Spot trades first) and enable one run to connect to Hyperliquid + MEXC simultaneously, emitting a default unified JSONL envelope that is easy for downstream apps to consume.
+
+MVP scope (IN)
+
+Exchanges / markets
+
+Hyperliquid (existing): public trades + private positions (unchanged behavior).
+
+MEXC: Spot public trades (proof), with the adapter structured so Futures can be added later without refactor.
+
+Multi-exchange / multi-symbol
+
+New “mux” capability: single run connects to HL + MEXC concurrently and multiplexes stdout.
+
+Multiple symbols per exchange: subscribe to N symbols on one WS connection (fallback “one connection per symbol” is OUT for M2).
+
+Unified output
+
+Default stdout format becomes Envelope JSONL (1 JSON object per line).
+
+--format raw preserves exact M1 behavior for legacy single-exchange commands (especially hl ...).
+
+Docs
+
+Fill README sections: Overview / Goals / Non-Goals (M1 behavior already correct; just missing text).
+
+Update DECISIONS.md with M2 decisions (envelope default, mux syntax, MEXC protobuf parsing approach).
+
+Non-goals (OUT)
+
+No normalized cross-exchange schema (no “trade.price/size” normalization).
+
+No cross-exchange symbol aliasing.
+
+No persistence, DB, TUI.
+
+No trading actions (place/cancel).
+
+No “one connection per symbol” optimization / fallback logic (defer).
+
+No MEXC private/user streams in M2.
+
+No MEXC Futures implementation in M2 (only adapter scaffolding).
+
+Constraints
+
+Maintain M1 IO contract: stdout = data only, stderr = logs/errors only.
+
+Determinism stays: --max-messages, --timeout-seconds, Ctrl+C clean exit (0).
+
+Reconnect/backoff semantics remain (cap=3), and mux cancels all connections on stop conditions.
+
+Exchange-native symbols only.
+
+Milestone 1 Definition of Done (M2 DoD)
+
+Milestone 2 is done when all are true:
+
+xws can run HL trades + MEXC Spot trades concurrently in one command and emits envelope JSONL lines to stdout.
+
+--max-messages caps total emitted lines across mux and exits cleanly.
+
+--timeout-seconds exits cleanly after timeout across mux.
+
+Legacy hl ... --format raw output remains byte-for-byte contract-equivalent (JSONL raw frames) to M1 behavior.
+
+CI passes on Windows + Ubuntu.
+
+“Done enough” declaration (mandatory)
+
+This milestone is done even if:
+
+Envelope fields are not “perfectly future-proof”
+
+Copy in docs is basic
+
+No fancy filtering / wildcards
+
+No deep edge-case handling beyond reconnect/backoff already present
+
+Repo starter pack files
+
+Already exist from M1 (README.md, DECISIONS.md, agents.md, PROMPTS.md, CHECKLIST.md). M2 will update (not recreate) where needed.
+
+Minimal architecture (M2)
+
+Output: JsonlWriter stays; add EnvelopeWriter that wraps messages.
+
+Format switch: --format envelope|raw (envelope default).
+
+Mux runner: orchestrates N exchange runners concurrently, aggregates stop conditions, and writes envelope lines.
+
+MEXC Spot adapter:
+
+Sends JSON subscription messages.
+
+Parses protobuf pushed frames (per MEXC Spot WS docs) into JSON (via Google.Protobuf JSON formatting).
+
+Outputs envelope lines with exchange=mexc, market=spot, stream=trades.
+
+Futures scaffolding: config + endpoint enum + placeholder class stubs, but no runtime features.
+
+Acceptance + validation commands (baseline)
+
+From repo root:
+
+dotnet build -c Release
+
+# Legacy behavior still works (envelope default may change only for new mux; raw preserves M1)
+dotnet run --project src/xws -- hl subscribe trades --symbol SOL --format raw --max-messages 10 --timeout-seconds 30
+
+# MEXC Spot trades (new)
+dotnet run --project src/xws -- mexc spot subscribe trades --symbol BTCUSDT --max-messages 10 --timeout-seconds 30
+
+# Mux HL + MEXC together (new)
+dotnet run --project src/xws -- subscribe trades \
+  --sub hl=SOL \
+  --sub mexc.spot=BTCUSDT,ETHUSDT \
+  --max-messages 50 --timeout-seconds 30
+
+# HL private remains unchanged
+# PowerShell:
+# $env:XWS_HL_USER="0xYourAddressHere"
+# dotnet run --project src/xws -- hl subscribe positions --max-messages 10 --timeout-seconds 30
