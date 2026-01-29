@@ -112,10 +112,74 @@ tradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeoutSec
 }, tradesSymbolOption, maxMessagesOption, timeoutSecondsOption);
 
 var positionsCommand = new Command("positions", "Subscribe to positions/account stream");
-positionsCommand.SetHandler(() =>
+positionsCommand.AddOption(maxMessagesOption);
+positionsCommand.AddOption(timeoutSecondsOption);
+positionsCommand.SetHandler(async (int? maxMessages, int? timeoutSeconds) =>
 {
-    Logger.Info("hl subscribe positions: not implemented");
-});
+    using var cts = new CancellationTokenSource();
+    var cancelLogged = 0;
+    Console.CancelKeyPress += (_, e) =>
+    {
+        e.Cancel = true;
+        if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+        {
+            Logger.Info("shutdown requested");
+        }
+        cts.Cancel();
+    };
+
+    if (maxMessages.HasValue && maxMessages.Value <= 0)
+    {
+        Logger.Error("--max-messages must be greater than 0");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+    {
+        Logger.Error("--timeout-seconds must be greater than 0");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+    {
+        Logger.Error("--timeout-seconds requires --max-messages");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    var user = EnvReader.GetOptional("XWS_HL_USER");
+    if (string.IsNullOrWhiteSpace(user))
+    {
+        Logger.Error("missing required env var: XWS_HL_USER");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    try
+    {
+        var config = HyperliquidConfig.Load();
+        var subscription = HyperliquidWs.BuildClearinghouseStateSubscription(user);
+        var writer = new JsonlWriter();
+        var registry = new SubscriptionRegistry();
+        registry.Add(subscription);
+        var runner = new WebSocketRunner(writer, registry);
+        var options = new WebSocketRunnerOptions
+        {
+            MaxMessages = maxMessages,
+            Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+        };
+
+        var exitCode = await runner.RunAsync(config.WsUri, options, cts.Token);
+        Environment.ExitCode = exitCode;
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"hl subscribe positions failed: {ex.Message}");
+        Environment.ExitCode = 1;
+    }
+}, maxMessagesOption, timeoutSecondsOption);
 
 hlSubscribeCommand.AddCommand(tradesCommand);
 hlSubscribeCommand.AddCommand(positionsCommand);
