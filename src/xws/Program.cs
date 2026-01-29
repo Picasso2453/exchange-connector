@@ -1,6 +1,6 @@
 using System.CommandLine;
-using System.Text.Json;
 using xws.Core.Env;
+using xws.Core.Mux;
 using xws.Core.Output;
 using xws.Core.Subscriptions;
 using xws.Core.WebSocket;
@@ -26,8 +26,20 @@ muxTradesCommand.AddOption(muxSubOption);
 muxTradesCommand.AddOption(muxMaxMessagesOption);
 muxTradesCommand.AddOption(muxTimeoutSecondsOption);
 muxTradesCommand.AddOption(muxFormatOption);
-muxTradesCommand.SetHandler((string[] subs, int? maxMessages, int? timeoutSeconds, string format) =>
+muxTradesCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeoutSeconds, string format) =>
 {
+    using var cts = new CancellationTokenSource();
+    var cancelLogged = 0;
+    Console.CancelKeyPress += (_, e) =>
+    {
+        e.Cancel = true;
+        if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+        {
+            Logger.Info("shutdown requested");
+        }
+        cts.Cancel();
+    };
+
     if (!IsValidFormat(format))
     {
         Logger.Error("--format must be envelope or raw");
@@ -69,27 +81,30 @@ muxTradesCommand.SetHandler((string[] subs, int? maxMessages, int? timeoutSecond
         parsed.Add(parsedSub);
     }
 
-    var emitted = 0;
-    foreach (var sub in parsed)
+    var options = new MuxRunnerOptions
     {
-        if (maxMessages.HasValue && emitted >= maxMessages.Value)
-        {
-            break;
-        }
+        MaxMessages = maxMessages,
+        Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+    };
 
-        if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
-        {
-            var raw = new JsonlWriter();
-            raw.WriteLine($"{{\"status\":\"planned\",\"exchange\":\"{sub.Exchange}\",\"market\":\"{sub.Market}\",\"symbols\":{JsonSerializer.Serialize(sub.Symbols)}}}");
-        }
-        else
-        {
-            var writer = new EnvelopeWriter(sub.Exchange, "trades", sub.Market, sub.Symbols);
-            writer.WriteRawObject(new { status = "planned" });
-        }
+    var runner = new MuxRunner(new JsonlWriter());
+    var producers = parsed.Select(sub => (Func<System.Threading.Channels.ChannelWriter<EnvelopeV1>, CancellationToken, Task>)(async (writer, token) =>
+    {
+        var envelope = new EnvelopeV1(
+            "xws.envelope.v1",
+            sub.Exchange,
+            sub.Market,
+            "trades",
+            sub.Symbols,
+            DateTimeOffset.UtcNow.ToString("O"),
+            new { status = "planned" },
+            "json");
 
-        emitted++;
-    }
+        await writer.WriteAsync(envelope, token);
+    })).ToList();
+
+    var exitCode = await runner.RunAsync(producers, options, cts.Token);
+    Environment.ExitCode = exitCode;
 }, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
 
 muxCommand.AddCommand(muxTradesCommand);
