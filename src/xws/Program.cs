@@ -9,10 +9,35 @@ var root = new RootCommand("xws CLI");
 var hlCommand = new Command("hl", "Hyperliquid adapter");
 
 var hlSymbolsCommand = new Command("symbols", "List available symbols/instruments");
-hlSymbolsCommand.SetHandler(() =>
+var symbolsFilterOption = new Option<string?>("--filter", "Filter by substring");
+hlSymbolsCommand.AddOption(symbolsFilterOption);
+hlSymbolsCommand.SetHandler(async (string? filter) =>
 {
-    Logger.Info("hl symbols: not implemented");
-});
+    var writer = new JsonlWriter();
+
+    try
+    {
+        var httpUri = new Uri(HyperliquidHttp.MainnetUrl);
+        Logger.Info($"symbols: posting to {httpUri}");
+
+        var meta = await HyperliquidHttp.PostInfoAsync(httpUri, "meta", CancellationToken.None);
+        if (ShouldEmit(meta, filter))
+        {
+            writer.WriteLine(meta);
+        }
+
+        var spotMeta = await HyperliquidHttp.PostInfoAsync(httpUri, "spotMeta", CancellationToken.None);
+        if (ShouldEmit(spotMeta, filter))
+        {
+            writer.WriteLine(spotMeta);
+        }
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"hl symbols failed: {ex.Message}");
+        Environment.ExitCode = 1;
+    }
+}, symbolsFilterOption);
 
 var hlSubscribeCommand = new Command("subscribe", "Subscribe to Hyperliquid streams");
 
@@ -91,3 +116,13 @@ hlCommand.AddCommand(hlSubscribeCommand);
 root.AddCommand(hlCommand);
 
 return await root.InvokeAsync(args);
+
+static bool ShouldEmit(string json, string? filter)
+{
+    if (string.IsNullOrWhiteSpace(filter))
+    {
+        return true;
+    }
+
+    return json.Contains(filter, StringComparison.OrdinalIgnoreCase);
+}
