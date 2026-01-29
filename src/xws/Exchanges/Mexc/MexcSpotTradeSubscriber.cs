@@ -90,17 +90,15 @@ public sealed class MexcSpotTradeSubscriber
             }
             else if (result.MessageType == WebSocketMessageType.Binary)
             {
-                try
+                var payloadBytes = messageBuffer.ToArray();
+                if (MexcSpotProtoDecoder.TryDecodeToJsonElement(payloadBytes, out var jsonElement))
                 {
-                    var payloadBytes = messageBuffer.ToArray();
-                    var wrapper = PushDataV3ApiWrapper.Parser.ParseFrom(payloadBytes);
-                    var jsonPayload = JsonFormatter.Default.Format(wrapper);
-                    writer.WriteRawJson(jsonPayload);
+                    writer.WriteRawJson(jsonElement.ToString());
                     messageCount++;
                 }
-                catch (Exception ex)
+                else
                 {
-                    Logger.Error($"mexc spot protobuf decode failed: {ex.Message}");
+                    Logger.Error("mexc spot protobuf decode failed");
                 }
 
                 if (maxMessages.HasValue && messageCount >= maxMessages.Value)
