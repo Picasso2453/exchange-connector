@@ -21,8 +21,12 @@ var tradesSymbolOption = new Option<string>("--symbol", "Native coin symbol")
 {
     IsRequired = true
 };
+var maxMessagesOption = new Option<int?>("--max-messages", "Stop after N JSONL messages (exit 0)");
+var timeoutSecondsOption = new Option<int?>("--timeout-seconds", "Fail if max messages not reached within T seconds");
 tradesCommand.AddOption(tradesSymbolOption);
-tradesCommand.SetHandler(async (string symbol) =>
+tradesCommand.AddOption(maxMessagesOption);
+tradesCommand.AddOption(timeoutSecondsOption);
+tradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeoutSeconds) =>
 {
     using var cts = new CancellationTokenSource();
     var cancelLogged = 0;
@@ -36,15 +40,41 @@ tradesCommand.SetHandler(async (string symbol) =>
         cts.Cancel();
     };
 
+    if (maxMessages.HasValue && maxMessages.Value <= 0)
+    {
+        Logger.Error("--max-messages must be greater than 0");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+    {
+        Logger.Error("--timeout-seconds must be greater than 0");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+    {
+        Logger.Error("--timeout-seconds requires --max-messages");
+        Environment.ExitCode = 1;
+        return;
+    }
+
     var subscription = HyperliquidWs.BuildTradesSubscription(symbol);
     var writer = new JsonlWriter();
     var registry = new SubscriptionRegistry();
     registry.Add(subscription);
     var runner = new WebSocketRunner(writer, registry);
+    var options = new WebSocketRunnerOptions
+    {
+        MaxMessages = maxMessages,
+        Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+    };
 
-    var exitCode = await runner.RunAsync(new Uri(HyperliquidWs.MainnetUrl), cts.Token);
+    var exitCode = await runner.RunAsync(new Uri(HyperliquidWs.MainnetUrl), options, cts.Token);
     Environment.ExitCode = exitCode;
-}, tradesSymbolOption);
+}, tradesSymbolOption, maxMessagesOption, timeoutSecondsOption);
 
 var positionsCommand = new Command("positions", "Subscribe to positions/account stream");
 positionsCommand.SetHandler(() =>

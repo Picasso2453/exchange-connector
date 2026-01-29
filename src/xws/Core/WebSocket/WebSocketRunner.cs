@@ -18,23 +18,37 @@ public sealed class WebSocketRunner
         _registry = registry;
     }
 
-    public async Task<int> RunAsync(Uri uri, CancellationToken cancellationToken)
+    public async Task<int> RunAsync(Uri uri, WebSocketRunnerOptions options, CancellationToken cancellationToken)
     {
         var reconnectAttempts = 0;
+        var state = new RunState();
+        using var timeoutCts = options.Timeout.HasValue
+            ? new CancellationTokenSource(options.Timeout.Value)
+            : null;
+        using var linkedCts = timeoutCts is not null
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
+            : null;
+        var runToken = linkedCts?.Token ?? cancellationToken;
 
-        while (!cancellationToken.IsCancellationRequested)
+        while (!runToken.IsCancellationRequested)
         {
             try
             {
                 using var socket = new ClientWebSocket();
                 Logger.Info($"connecting: {uri}");
-                await socket.ConnectAsync(uri, cancellationToken);
+                await socket.ConnectAsync(uri, runToken);
                 Logger.Info("connected");
 
-                await SendAllSubscriptionsAsync(socket, cancellationToken);
+                await SendAllSubscriptionsAsync(socket, runToken);
 
-                var outcome = await ReceiveLoopAsync(socket, cancellationToken);
-                if (outcome)
+                var outcome = await ReceiveLoopAsync(socket, runToken, options, state);
+                if (outcome.MaxMessagesReached)
+                {
+                    Logger.Info($"max messages reached: {state.MessageCount}");
+                    return 0;
+                }
+
+                if (outcome.ReceivedAny)
                 {
                     reconnectAttempts = 0;
                 }
@@ -43,12 +57,17 @@ public sealed class WebSocketRunner
             {
                 break;
             }
+            catch (OperationCanceledException) when (timeoutCts?.IsCancellationRequested == true)
+            {
+                Logger.Error($"timeout reached before max messages: {state.MessageCount}");
+                return 1;
+            }
             catch (Exception ex)
             {
                 Logger.Error($"connection error: {ex.Message}");
             }
 
-            if (cancellationToken.IsCancellationRequested)
+            if (runToken.IsCancellationRequested)
             {
                 break;
             }
@@ -65,21 +84,30 @@ public sealed class WebSocketRunner
 
             try
             {
-                await Task.Delay(delay, cancellationToken);
+                await Task.Delay(delay, runToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 break;
+            }
+            catch (OperationCanceledException) when (timeoutCts?.IsCancellationRequested == true)
+            {
+                Logger.Error($"timeout reached before max messages: {state.MessageCount}");
+                return 1;
             }
         }
 
         return 0;
     }
 
-    private async Task<bool> ReceiveLoopAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+    private async Task<ReceiveOutcome> ReceiveLoopAsync(
+        ClientWebSocket socket,
+        CancellationToken cancellationToken,
+        WebSocketRunnerOptions options,
+        RunState state)
     {
         var buffer = new byte[8192];
-        var receivedAny = false;
+        var outcome = new ReceiveOutcome();
 
         while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
         {
@@ -94,7 +122,7 @@ public sealed class WebSocketRunner
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
                     Logger.Info("remote closed connection");
-                    return receivedAny;
+                    return outcome;
                 }
 
                 messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
@@ -105,11 +133,18 @@ public sealed class WebSocketRunner
             {
                 var text = Encoding.UTF8.GetString(messageBuffer.ToArray());
                 _writer.WriteLine(text);
-                receivedAny = true;
+                outcome.ReceivedAny = true;
+                state.MessageCount++;
+
+                if (options.MaxMessages.HasValue && state.MessageCount >= options.MaxMessages.Value)
+                {
+                    outcome.MaxMessagesReached = true;
+                    return outcome;
+                }
             }
         }
 
-        return receivedAny;
+        return outcome;
     }
 
     private async Task SendAllSubscriptionsAsync(ClientWebSocket socket, CancellationToken cancellationToken)
@@ -128,4 +163,14 @@ public sealed class WebSocketRunner
         return socket.SendAsync(segment, WebSocketMessageType.Text, true, cancellationToken);
     }
 
+    private sealed class ReceiveOutcome
+    {
+        public bool ReceivedAny { get; set; }
+        public bool MaxMessagesReached { get; set; }
+    }
+
+    private sealed class RunState
+    {
+        public int MessageCount { get; set; }
+    }
 }
