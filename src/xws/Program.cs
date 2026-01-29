@@ -5,10 +5,97 @@ using xws.Core.Output;
 using xws.Core.Subscriptions;
 using xws.Core.WebSocket;
 using xws.Exchanges.Hyperliquid;
+using xws.Exchanges.Mexc;
 
 var root = new RootCommand("xws CLI");
 
+var muxMaxMessagesOption = new Option<int?>("--max-messages", "Stop after N JSONL messages (exit 0)");
+var muxTimeoutSecondsOption = new Option<int?>("--timeout-seconds", "Fail if max messages not reached within T seconds");
+
 var hlCommand = new Command("hl", "Hyperliquid adapter");
+var mexcCommand = new Command("mexc", "MEXC adapter");
+var mexcSpotCommand = new Command("spot", "MEXC spot");
+var mexcSubscribeCommand = new Command("subscribe", "Subscribe to MEXC streams");
+var mexcTradesCommand = new Command("trades", "Subscribe to MEXC spot trades");
+var mexcSymbolOption = new Option<string>("--symbol", "Symbol list (comma-separated)")
+{
+    IsRequired = true
+};
+mexcTradesCommand.AddOption(mexcSymbolOption);
+mexcTradesCommand.AddOption(muxMaxMessagesOption);
+mexcTradesCommand.AddOption(muxTimeoutSecondsOption);
+mexcTradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeoutSeconds) =>
+{
+    using var cts = new CancellationTokenSource();
+    var cancelLogged = 0;
+    Console.CancelKeyPress += (_, e) =>
+    {
+        e.Cancel = true;
+        if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+        {
+            Logger.Info("shutdown requested");
+        }
+        cts.Cancel();
+    };
+
+    if (maxMessages.HasValue && maxMessages.Value <= 0)
+    {
+        Logger.Error("--max-messages must be greater than 0");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+    {
+        Logger.Error("--timeout-seconds must be greater than 0");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+    {
+        Logger.Error("--timeout-seconds requires --max-messages");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    var symbols = symbol
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(s => s.ToUpperInvariant())
+        .ToArray();
+
+    if (symbols.Length == 0)
+    {
+        Logger.Error("--symbol requires at least one value");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    if (symbols.Length > 30)
+    {
+        Logger.Error("mexc spot supports max 30 subscriptions per connection");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    try
+    {
+        var config = MexcConfig.Load();
+        var subscriber = new MexcSpotTradeSubscriber();
+        var exitCode = await subscriber.RunAsync(
+            config.SpotWsUri,
+            symbols,
+            maxMessages,
+            timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null,
+            cts.Token);
+        Environment.ExitCode = exitCode;
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"mexc spot subscribe trades failed: {ex.Message}");
+        Environment.ExitCode = 1;
+    }
+}, mexcSymbolOption, muxMaxMessagesOption, muxTimeoutSecondsOption);
 
 var muxCommand = new Command("subscribe", "Subscribe to multiple exchanges");
 var muxTradesCommand = new Command("trades", "Mux trades subscriptions");
@@ -18,8 +105,6 @@ var muxSubOption = new Option<string[]>(
 {
     Arity = ArgumentArity.OneOrMore
 };
-var muxMaxMessagesOption = new Option<int?>("--max-messages", "Stop after N JSONL messages (exit 0)");
-var muxTimeoutSecondsOption = new Option<int?>("--timeout-seconds", "Fail if max messages not reached within T seconds");
 var muxFormatOption = new Option<string>("--format", () => "envelope", "Output format: envelope|raw");
 
 muxTradesCommand.AddOption(muxSubOption);
@@ -321,7 +406,12 @@ hlSubscribeCommand.AddCommand(positionsCommand);
 hlCommand.AddCommand(hlSymbolsCommand);
 hlCommand.AddCommand(hlSubscribeCommand);
 
+mexcSubscribeCommand.AddCommand(mexcTradesCommand);
+mexcSpotCommand.AddCommand(mexcSubscribeCommand);
+mexcCommand.AddCommand(mexcSpotCommand);
+
 root.AddCommand(hlCommand);
+root.AddCommand(mexcCommand);
 root.AddCommand(muxCommand);
 
 return await root.InvokeAsync(args);
