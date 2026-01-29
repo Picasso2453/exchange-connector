@@ -2,6 +2,7 @@ using System.CommandLine;
 using xws.Core.Env;
 using xws.Core.Mux;
 using xws.Core.Output;
+using xws.Core.Runner;
 using xws.Core.Subscriptions;
 using xws.Core.WebSocket;
 using xws.Exchanges.Hyperliquid;
@@ -80,10 +81,8 @@ mexcTradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeou
 
     try
     {
-        var config = MexcConfig.Load();
-        var subscriber = new MexcSpotTradeSubscriber();
-        var exitCode = await subscriber.RunAsync(
-            config.SpotWsUri,
+        var runner = new XwsRunner();
+        var exitCode = await runner.RunMexcSpotTradesAsync(
             symbols,
             maxMessages,
             timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null,
@@ -179,26 +178,9 @@ muxTradesCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeout
         Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
     };
 
-    var runner = new MuxRunner(new JsonlWriter());
-    var producers = parsed.Select(sub => (Func<System.Threading.Channels.ChannelWriter<EnvelopeV1>, CancellationToken, Task>)(async (writer, token) =>
-    {
-        if (sub.Exchange.Equals("hl", StringComparison.OrdinalIgnoreCase))
-        {
-            await HyperliquidMuxSource.RunTradesAsync(sub.Symbols, writer, token);
-            return;
-        }
-
-        if (sub.Exchange.Equals("mexc", StringComparison.OrdinalIgnoreCase)
-            && string.Equals(sub.Market, "spot", StringComparison.OrdinalIgnoreCase))
-        {
-            await MexcSpotMuxSource.RunTradesAsync(sub.Symbols, writer, token);
-            return;
-        }
-
-        Logger.Error($"unsupported mux exchange: {sub.Exchange}");
-    })).ToList();
-
-    var exitCode = await runner.RunAsync(producers, options, cts.Token);
+    var runner = new XwsRunner();
+    var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
+    var exitCode = await runner.RunMuxTradesAsync(muxSubs, options, cts.Token);
     Environment.ExitCode = exitCode;
 }, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
 
@@ -293,21 +275,14 @@ tradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeoutSec
 
     try
     {
-        var config = HyperliquidConfig.Load();
-        var subscription = HyperliquidWs.BuildTradesSubscription(symbol);
-        IJsonlWriter writer = format == "raw"
-            ? new JsonlWriter()
-            : new EnvelopeWriter("hl", "trades", null, new[] { symbol });
-        var registry = new SubscriptionRegistry();
-        registry.Add(subscription);
-        var runner = new WebSocketRunner(writer, registry);
+        var runner = new XwsRunner();
         var options = new WebSocketRunnerOptions
         {
             MaxMessages = maxMessages,
             Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
         };
 
-        var exitCode = await runner.RunAsync(config.WsUri, options, cts.Token);
+        var exitCode = await runner.RunHlTradesAsync(symbol, options, format, cts.Token);
         Environment.ExitCode = exitCode;
     }
     catch (Exception ex)
@@ -373,21 +348,14 @@ positionsCommand.SetHandler(async (int? maxMessages, int? timeoutSeconds, string
 
     try
     {
-        var config = HyperliquidConfig.Load();
-        var subscription = HyperliquidWs.BuildClearinghouseStateSubscription(user);
-        IJsonlWriter writer = format == "raw"
-            ? new JsonlWriter()
-            : new EnvelopeWriter("hl", "positions", null, null);
-        var registry = new SubscriptionRegistry();
-        registry.Add(subscription);
-        var runner = new WebSocketRunner(writer, registry);
+        var runner = new XwsRunner();
         var options = new WebSocketRunnerOptions
         {
             MaxMessages = maxMessages,
             Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
         };
 
-        var exitCode = await runner.RunAsync(config.WsUri, options, cts.Token);
+        var exitCode = await runner.RunHlPositionsAsync(user, options, format, cts.Token);
         Environment.ExitCode = exitCode;
     }
     catch (Exception ex)
