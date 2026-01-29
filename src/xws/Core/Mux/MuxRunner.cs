@@ -40,6 +40,7 @@ public sealed class MuxRunner
 
         var emitted = 0;
         var timedOut = false;
+        var hadProducerFailures = false;
 
         try
         {
@@ -88,12 +89,17 @@ public sealed class MuxRunner
         if (producerTasks.Any(t => t.IsFaulted))
         {
             Logger.Error("mux producer failed");
-            return 1;
+            hadProducerFailures = true;
         }
 
         if (timedOut)
         {
             Logger.Error("mux timeout reached");
+        }
+
+        if (emitted == 0 && (timedOut || hadProducerFailures))
+        {
+            return 1;
         }
 
         return 0;

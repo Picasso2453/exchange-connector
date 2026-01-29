@@ -188,17 +188,14 @@ muxTradesCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeout
             return;
         }
 
-        var envelope = new EnvelopeV1(
-            "xws.envelope.v1",
-            sub.Exchange,
-            sub.Market,
-            "trades",
-            sub.Symbols,
-            DateTimeOffset.UtcNow.ToString("O"),
-            new { status = "planned" },
-            "json");
+        if (sub.Exchange.Equals("mexc", StringComparison.OrdinalIgnoreCase)
+            && string.Equals(sub.Market, "spot", StringComparison.OrdinalIgnoreCase))
+        {
+            await MexcSpotMuxSource.RunTradesAsync(sub.Symbols, writer, token);
+            return;
+        }
 
-        await writer.WriteAsync(envelope, token);
+        Logger.Error($"unsupported mux exchange: {sub.Exchange}");
     })).ToList();
 
     var exitCode = await runner.RunAsync(producers, options, cts.Token);
