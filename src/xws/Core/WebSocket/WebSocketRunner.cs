@@ -18,7 +18,11 @@ public sealed class WebSocketRunner
         _registry = registry;
     }
 
-    public async Task<int> RunAsync(Uri uri, WebSocketRunnerOptions options, CancellationToken cancellationToken)
+    public async Task<int> RunAsync(
+        Uri uri,
+        WebSocketRunnerOptions options,
+        CancellationToken cancellationToken,
+        Func<string, Task>? frameHandler = null)
     {
         var reconnectAttempts = 0;
         var state = new RunState();
@@ -41,7 +45,7 @@ public sealed class WebSocketRunner
 
                 await SendAllSubscriptionsAsync(socket, runToken);
 
-                var outcome = await ReceiveLoopAsync(socket, runToken, options, state);
+                var outcome = await ReceiveLoopAsync(socket, runToken, options, state, frameHandler);
                 if (outcome.MaxMessagesReached)
                 {
                     Logger.Info($"max messages reached: {state.MessageCount}");
@@ -104,7 +108,8 @@ public sealed class WebSocketRunner
         ClientWebSocket socket,
         CancellationToken cancellationToken,
         WebSocketRunnerOptions options,
-        RunState state)
+        RunState state,
+        Func<string, Task>? frameHandler)
     {
         var buffer = new byte[8192];
         var outcome = new ReceiveOutcome();
@@ -132,7 +137,14 @@ public sealed class WebSocketRunner
             if (result.MessageType == WebSocketMessageType.Text)
             {
                 var text = Encoding.UTF8.GetString(messageBuffer.ToArray());
-                _writer.WriteLine(text);
+                if (frameHandler is not null)
+                {
+                    await frameHandler(text);
+                }
+                else
+                {
+                    _writer.WriteLine(text);
+                }
                 outcome.ReceivedAny = true;
                 state.MessageCount++;
 
