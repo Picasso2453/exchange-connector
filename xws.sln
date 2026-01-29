@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "xws", "src\xws\xws.csproj",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "xws.tests", "tests\xws.tests\xws.tests.csproj", "{6D885369-47CE-46B7-B0FA-19CB9E92F447}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Xws.Core", "src\Xws.Core\Xws.Core.csproj", "{43705B88-7271-497A-9831-A30F5483BBF5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,6 +45,18 @@ Global
 		{6D885369-47CE-46B7-B0FA-19CB9E92F447}.Release|x64.Build.0 = Release|Any CPU
 		{6D885369-47CE-46B7-B0FA-19CB9E92F447}.Release|x86.ActiveCfg = Release|Any CPU
 		{6D885369-47CE-46B7-B0FA-19CB9E92F447}.Release|x86.Build.0 = Release|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Debug|x64.Build.0 = Debug|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Debug|x86.Build.0 = Debug|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Release|x64.ActiveCfg = Release|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Release|x64.Build.0 = Release|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Release|x86.ActiveCfg = Release|Any CPU
+		{43705B88-7271-497A-9831-A30F5483BBF5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -50,5 +64,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{6BD5346F-2FDB-4D30-9EC9-D0E36A96F7F3} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{6D885369-47CE-46B7-B0FA-19CB9E92F447} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{43705B88-7271-497A-9831-A30F5483BBF5} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
