@@ -1,4 +1,5 @@
 using System.CommandLine;
+using xws.Core.Env;
 using xws.Core.Output;
 using xws.Core.Subscriptions;
 using xws.Core.WebSocket;
@@ -17,16 +18,16 @@ hlSymbolsCommand.SetHandler(async (string? filter) =>
 
     try
     {
-        var httpUri = new Uri(HyperliquidHttp.MainnetUrl);
-        Logger.Info($"symbols: posting to {httpUri}");
+        var config = HyperliquidConfig.Load();
+        Logger.Info($"symbols: posting to {config.HttpUri}");
 
-        var meta = await HyperliquidHttp.PostInfoAsync(httpUri, "meta", CancellationToken.None);
+        var meta = await HyperliquidHttp.PostInfoAsync(config.HttpUri, "meta", CancellationToken.None);
         if (ShouldEmit(meta, filter))
         {
             writer.WriteLine(meta);
         }
 
-        var spotMeta = await HyperliquidHttp.PostInfoAsync(httpUri, "spotMeta", CancellationToken.None);
+        var spotMeta = await HyperliquidHttp.PostInfoAsync(config.HttpUri, "spotMeta", CancellationToken.None);
         if (ShouldEmit(spotMeta, filter))
         {
             writer.WriteLine(spotMeta);
@@ -86,19 +87,28 @@ tradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeoutSec
         return;
     }
 
-    var subscription = HyperliquidWs.BuildTradesSubscription(symbol);
-    var writer = new JsonlWriter();
-    var registry = new SubscriptionRegistry();
-    registry.Add(subscription);
-    var runner = new WebSocketRunner(writer, registry);
-    var options = new WebSocketRunnerOptions
+    try
     {
-        MaxMessages = maxMessages,
-        Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
-    };
+        var config = HyperliquidConfig.Load();
+        var subscription = HyperliquidWs.BuildTradesSubscription(symbol);
+        var writer = new JsonlWriter();
+        var registry = new SubscriptionRegistry();
+        registry.Add(subscription);
+        var runner = new WebSocketRunner(writer, registry);
+        var options = new WebSocketRunnerOptions
+        {
+            MaxMessages = maxMessages,
+            Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+        };
 
-    var exitCode = await runner.RunAsync(new Uri(HyperliquidWs.MainnetUrl), options, cts.Token);
-    Environment.ExitCode = exitCode;
+        var exitCode = await runner.RunAsync(config.WsUri, options, cts.Token);
+        Environment.ExitCode = exitCode;
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"hl subscribe trades failed: {ex.Message}");
+        Environment.ExitCode = 1;
+    }
 }, tradesSymbolOption, maxMessagesOption, timeoutSecondsOption);
 
 var positionsCommand = new Command("positions", "Subscribe to positions/account stream");

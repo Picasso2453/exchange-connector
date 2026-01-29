@@ -6,6 +6,7 @@ namespace xws.Exchanges.Hyperliquid;
 public static class HyperliquidWs
 {
     public const string MainnetUrl = "wss://api.hyperliquid.xyz/ws";
+    public const string TestnetUrl = "wss://api.hyperliquid-testnet.xyz/ws";
 
     public static SubscriptionRequest BuildTradesSubscription(string symbol)
     {
@@ -20,6 +21,22 @@ public static class HyperliquidWs
         };
 
         var key = new SubscriptionKey("trades", $"coin={symbol}");
+        return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
+    }
+
+    public static SubscriptionRequest BuildClearinghouseStateSubscription(string user)
+    {
+        var payload = new
+        {
+            method = "subscribe",
+            subscription = new
+            {
+                type = "clearinghouseState",
+                user
+            }
+        };
+
+        var key = new SubscriptionKey("clearinghouseState", $"user={user}");
         return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
     }
 }
