@@ -8,3 +8,7 @@
 - Secrets: env vars only; no secrets written to disk.
 - Symbols: exchange-native only; discovery via `hl symbols`.
 - Reconnect: exponential backoff with retry cap = 3; resubscribe on reconnect.
+
+## Milestone 2 (Draft)
+
+- Pending decisions.
