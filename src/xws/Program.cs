@@ -1,4 +1,5 @@
 using System.CommandLine;
+using xws.Core.Dev;
 using xws.Core.Env;
 using xws.Core.Mux;
 using xws.Core.Output;
@@ -14,6 +15,44 @@ var muxMaxMessagesOption = new Option<int?>("--max-messages", "Stop after N JSON
 var muxTimeoutSecondsOption = new Option<int?>("--timeout-seconds", "Fail if max messages not reached within T seconds");
 
 var hlCommand = new Command("hl", "Hyperliquid adapter");
+var devCommand = new Command("dev", "Developer utilities");
+var devEmitCommand = new Command("emit", "Emit deterministic JSONL lines (offline)");
+var devCountOption = new Option<int>("--count", "Number of lines to emit")
+{
+    IsRequired = true
+};
+var devTimeoutSecondsOption = new Option<int?>("--timeout-seconds", "Fail if not finished within T seconds");
+devEmitCommand.AddOption(devCountOption);
+devEmitCommand.AddOption(devTimeoutSecondsOption);
+devEmitCommand.SetHandler((int count, int? timeoutSeconds) =>
+{
+    if (count <= 0)
+    {
+        Logger.Error("--count must be greater than 0");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    using var cts = timeoutSeconds.HasValue
+        ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds.Value))
+        : new CancellationTokenSource();
+
+    var writer = new JsonlWriter();
+    try
+    {
+        foreach (var line in DevEmitter.BuildLines(count))
+        {
+            cts.Token.ThrowIfCancellationRequested();
+            writer.WriteLine(line);
+        }
+    }
+    catch (OperationCanceledException)
+    {
+        Logger.Error("dev emit timeout reached");
+        Environment.ExitCode = 1;
+    }
+}, devCountOption, devTimeoutSecondsOption);
+devCommand.AddCommand(devEmitCommand);
 var mexcCommand = new Command("mexc", "MEXC adapter");
 var mexcSpotCommand = new Command("spot", "MEXC spot");
 var mexcSubscribeCommand = new Command("subscribe", "Subscribe to MEXC streams");
@@ -376,6 +415,7 @@ mexcSpotCommand.AddCommand(mexcSubscribeCommand);
 mexcCommand.AddCommand(mexcSpotCommand);
 
 root.AddCommand(hlCommand);
+root.AddCommand(devCommand);
 root.AddCommand(mexcCommand);
 root.AddCommand(muxCommand);
 
