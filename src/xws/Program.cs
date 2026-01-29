@@ -1,5 +1,6 @@
 using System.CommandLine;
 using xws.Core.Output;
+using xws.Core.Subscriptions;
 using xws.Core.WebSocket;
 using xws.Exchanges.Hyperliquid;
 
@@ -32,9 +33,11 @@ tradesCommand.SetHandler(async (string symbol) =>
 
     var subscription = HyperliquidWs.BuildTradesSubscription(symbol);
     var writer = new JsonlWriter();
-    var runner = new WebSocketRunner(writer);
+    var registry = new SubscriptionRegistry();
+    registry.Add(subscription);
+    var runner = new WebSocketRunner(writer, registry);
 
-    var exitCode = await runner.RunAsync(new Uri(HyperliquidWs.MainnetUrl), new[] { subscription }, cts.Token);
+    var exitCode = await runner.RunAsync(new Uri(HyperliquidWs.MainnetUrl), cts.Token);
     Environment.ExitCode = exitCode;
 }, tradesSymbolOption);
 

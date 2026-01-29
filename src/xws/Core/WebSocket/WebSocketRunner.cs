@@ -1,6 +1,7 @@
 using System.Net.WebSockets;
 using System.Text;
 using xws.Core.Output;
+using xws.Core.Subscriptions;
 
 namespace xws.Core.WebSocket;
 
@@ -9,13 +10,15 @@ public sealed class WebSocketRunner
     private const int MaxReconnectAttempts = 3;
     private static readonly TimeSpan BaseBackoff = TimeSpan.FromSeconds(1);
     private readonly IJsonlWriter _writer;
+    private readonly SubscriptionRegistry _registry;
 
-    public WebSocketRunner(IJsonlWriter writer)
+    public WebSocketRunner(IJsonlWriter writer, SubscriptionRegistry registry)
     {
         _writer = writer;
+        _registry = registry;
     }
 
-    public async Task<int> RunAsync(Uri uri, IReadOnlyList<string> subscriptions, CancellationToken cancellationToken)
+    public async Task<int> RunAsync(Uri uri, CancellationToken cancellationToken)
     {
         var reconnectAttempts = 0;
 
@@ -28,15 +31,13 @@ public sealed class WebSocketRunner
                 await socket.ConnectAsync(uri, cancellationToken);
                 Logger.Info("connected");
 
-                foreach (var subscription in subscriptions)
+                await SendAllSubscriptionsAsync(socket, cancellationToken);
+
+                var outcome = await ReceiveLoopAsync(socket, cancellationToken);
+                if (outcome)
                 {
-                    await SendTextAsync(socket, subscription, cancellationToken);
-                    Logger.Info("subscribed");
+                    reconnectAttempts = 0;
                 }
-
-                reconnectAttempts = 0;
-
-                await ReceiveLoopAsync(socket, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -75,9 +76,10 @@ public sealed class WebSocketRunner
         return 0;
     }
 
-    private async Task ReceiveLoopAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+    private async Task<bool> ReceiveLoopAsync(ClientWebSocket socket, CancellationToken cancellationToken)
     {
         var buffer = new byte[8192];
+        var receivedAny = false;
 
         while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
         {
@@ -92,7 +94,7 @@ public sealed class WebSocketRunner
                 if (result.MessageType == WebSocketMessageType.Close)
                 {
                     Logger.Info("remote closed connection");
-                    return;
+                    return receivedAny;
                 }
 
                 messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
@@ -103,7 +105,19 @@ public sealed class WebSocketRunner
             {
                 var text = Encoding.UTF8.GetString(messageBuffer.ToArray());
                 _writer.WriteLine(text);
+                receivedAny = true;
             }
+        }
+
+        return receivedAny;
+    }
+
+    private async Task SendAllSubscriptionsAsync(ClientWebSocket socket, CancellationToken cancellationToken)
+    {
+        foreach (var subscription in _registry.GetAll())
+        {
+            await SendTextAsync(socket, subscription.Json, cancellationToken);
+            Logger.Info("subscribed");
         }
     }
 
@@ -113,4 +127,5 @@ public sealed class WebSocketRunner
         var segment = new ArraySegment<byte>(bytes);
         return socket.SendAsync(segment, WebSocketMessageType.Text, true, cancellationToken);
     }
+
 }
