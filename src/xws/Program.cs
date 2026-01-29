@@ -25,9 +25,14 @@ tradesCommand.AddOption(tradesSymbolOption);
 tradesCommand.SetHandler(async (string symbol) =>
 {
     using var cts = new CancellationTokenSource();
+    var cancelLogged = 0;
     Console.CancelKeyPress += (_, e) =>
     {
         e.Cancel = true;
+        if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+        {
+            Logger.Info("shutdown requested");
+        }
         cts.Cancel();
     };
 
