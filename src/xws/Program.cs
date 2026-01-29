@@ -47,6 +47,13 @@ muxTradesCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeout
         return;
     }
 
+    if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
+    {
+        Logger.Error("mux only supports --format envelope");
+        Environment.ExitCode = 1;
+        return;
+    }
+
     if (maxMessages.HasValue && maxMessages.Value <= 0)
     {
         Logger.Error("--max-messages must be greater than 0");
@@ -90,6 +97,12 @@ muxTradesCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeout
     var runner = new MuxRunner(new JsonlWriter());
     var producers = parsed.Select(sub => (Func<System.Threading.Channels.ChannelWriter<EnvelopeV1>, CancellationToken, Task>)(async (writer, token) =>
     {
+        if (sub.Exchange.Equals("hl", StringComparison.OrdinalIgnoreCase))
+        {
+            await HyperliquidMuxSource.RunTradesAsync(sub.Symbols, writer, token);
+            return;
+        }
+
         var envelope = new EnvelopeV1(
             "xws.envelope.v1",
             sub.Exchange,
