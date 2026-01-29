@@ -9,6 +9,17 @@
 
   <ItemGroup>
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+    <PackageReference Include="Google.Protobuf" Version="3.25.3" />
+    <PackageReference Include="Grpc.Tools" Version="2.60.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="Exchanges/Mexc/Proto/*.proto" GrpcServices="None" ProtoRoot="Exchanges/Mexc/Proto">
+      <CsharpNamespace>Xws.Exchanges.Mexc.Proto</CsharpNamespace>
+    </Protobuf>
   </ItemGroup>
 
 </Project>
