@@ -1,12 +1,15 @@
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using Google.Protobuf;
+using xws.Core.Output;
 
 namespace xws.Exchanges.Mexc;
 
 public sealed class MexcSpotTradeSubscriber
 {
     private const int MaxSubscriptions = 30;
+    private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(20);
 
     public async Task<int> RunAsync(
         Uri wsUri,
@@ -45,8 +48,20 @@ public sealed class MexcSpotTradeSubscriber
         var bytes = Encoding.UTF8.GetBytes(json);
         await socket.SendAsync(bytes, WebSocketMessageType.Text, true, runToken);
 
+        var writer = new EnvelopeWriter("mexc", "trades", "spot", symbols);
         var buffer = new byte[8192];
         var messageCount = 0;
+
+        using var pingCts = CancellationTokenSource.CreateLinkedTokenSource(runToken);
+        var pingTask = Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(PingInterval);
+            while (await timer.WaitForNextTickAsync(pingCts.Token))
+            {
+                var pingBytes = Encoding.UTF8.GetBytes("{\"method\":\"PING\"}");
+                await socket.SendAsync(pingBytes, WebSocketMessageType.Text, true, pingCts.Token);
+            }
+        }, pingCts.Token);
 
         while (!runToken.IsCancellationRequested && socket.State == WebSocketState.Open)
         {
@@ -65,11 +80,33 @@ public sealed class MexcSpotTradeSubscriber
             }
             while (!result.EndOfMessage);
 
-            if (result.MessageType == WebSocketMessageType.Binary || result.MessageType == WebSocketMessageType.Text)
+            if (result.MessageType == WebSocketMessageType.Text)
             {
-                messageCount++;
+                var text = Encoding.UTF8.GetString(messageBuffer.ToArray());
+                if (!string.Equals(text, "PONG", StringComparison.OrdinalIgnoreCase))
+                {
+                    Logger.Info($"mexc spot text frame: {text}");
+                }
+            }
+            else if (result.MessageType == WebSocketMessageType.Binary)
+            {
+                try
+                {
+                    var payloadBytes = messageBuffer.ToArray();
+                    var wrapper = PushDataV3ApiWrapper.Parser.ParseFrom(payloadBytes);
+                    var jsonPayload = JsonFormatter.Default.Format(wrapper);
+                    writer.WriteRawJson(jsonPayload);
+                    messageCount++;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error($"mexc spot protobuf decode failed: {ex.Message}");
+                }
+
                 if (maxMessages.HasValue && messageCount >= maxMessages.Value)
                 {
+                    pingCts.Cancel();
+                    await pingTask;
                     return 0;
                 }
             }
@@ -77,9 +114,12 @@ public sealed class MexcSpotTradeSubscriber
 
         if (timeoutCts?.IsCancellationRequested == true)
         {
+            Logger.Error("mexc spot timeout reached");
             return 1;
         }
 
+        pingCts.Cancel();
+        await pingTask;
         return 0;
     }
 }
