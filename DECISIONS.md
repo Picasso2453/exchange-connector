@@ -16,3 +16,9 @@
 - Best-effort mux: continue if one source fails; exit 0 if stop condition met and at least one envelope emitted, else exit 1.
 - MEXC spot uses protobuf decoding (official proto files); futures endpoint scaffold only in M2.
 - Network reachability: MEXC WS may be region-blocked; treated as supported runtime condition.
+
+## Milestone 3 (2026-01-30)
+
+- Packaging split: Xws.Core is a reusable library; xws CLI depends on it.
+- Output policy: single `Channel<string>` with one stdout writer in CLI; Core never writes to console.
+- Offline CI: build/test must succeed without live exchange endpoints; smoke is optional and allow-fail.
