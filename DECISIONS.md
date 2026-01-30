@@ -22,3 +22,8 @@
 - Packaging split: Xws.Core is a reusable library; xws CLI depends on it.
 - Output policy: single `Channel<string>` with one stdout writer in CLI; Core never writes to console.
 - Offline CI: build/test must succeed without live exchange endpoints; smoke is optional and allow-fail.
+
+## Milestone 4 (2026-01-30)
+
+- MEXC futures supported via mux using market key `mexc.fut`.
+- Mux supports `subscribe l2` for orderbook streams (envelope JSONL).
