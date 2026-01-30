@@ -82,3 +82,7 @@ dotnet run --project src/xws -- --help
 - MEXC spot trades adapter with protobuf decoding and offline test.
 - Mux command runs HL + MEXC concurrently with envelope JSONL default.
 - Best-effort mux behavior documented for partial network access.
+
+## Milestone 6 (Draft)
+- Add execution module (`Xws.Exec`) for safe place/cancel flows (library-first).
+- Keep receiver/ingestion behavior unchanged.

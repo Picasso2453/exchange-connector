@@ -19,6 +19,11 @@ deterministic CLI behavior.
 - Trading actions (place/cancel), signing, or key management.
 - Local persistence or stateful order management.
 
+## Execution (WIP)
+
+An execution module (`Xws.Exec`) is being added in Milestone 6 for safe
+place/cancel flows. It is library-first and does not change receiver behavior.
+
 ## Commands
 
 ### hl symbols
