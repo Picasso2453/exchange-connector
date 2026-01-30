@@ -116,6 +116,14 @@ the deterministic dev emitter:
 dotnet run --project src/xws -- dev emit --count 5 --timeout-seconds 5
 ```
 
+### .env loading (CLI only)
+
+- Default: loads `./.env` if it exists (no error if missing).
+- `--dotenv <path>`: load explicit file; missing file exits non-zero and logs to stderr.
+- `--no-dotenv`: disables dotenv loading entirely.
+- Precedence: process env vars win; dotenv fills missing values only.
+- Output contract: dotenv notices go to stderr; stdout remains JSONL-only.
+
 ## Env Vars
 
 - XWS_HL_NETWORK (optional, default: mainnet; values: mainnet|testnet)
