@@ -172,7 +172,8 @@ root.AddCommand(placeCommand);
 root.AddCommand(cancelCommand);
 root.AddCommand(cancelAllCommand);
 
-return await root.InvokeAsync(args);
+var exitCode = await root.InvokeAsync(args);
+return Environment.ExitCode != 0 ? Environment.ExitCode : exitCode;
 
 static bool TryParseMode(string value, out ExecutionMode mode)
 {
