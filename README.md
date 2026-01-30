@@ -78,6 +78,26 @@ dotnet run --project src/xws -- subscribe trades \
 Mux output defaults to an envelope JSONL format. Legacy HL commands support
 `--format raw` to preserve the M1 raw frame contract.
 
+## Library usage (Xws.Core)
+
+Xws.Core is the reusable runtime: adapters, mux runner, and JSONL formatting.
+You can reference it via project reference (today) or NuGet (once published).
+
+Project reference:
+
+```
+dotnet add <your-project> reference src/Xws.Core/Xws.Core.csproj
+```
+
+## CLI usage
+
+stdout is data only (JSONL). stderr is logs/errors. For offline validation, use
+the deterministic dev emitter:
+
+```
+dotnet run --project src/xws -- dev emit --count 5 --timeout-seconds 5
+```
+
 ## Env Vars
 
 - XWS_HL_NETWORK (optional, default: mainnet; values: mainnet|testnet)
@@ -136,8 +156,37 @@ Validated by CI on Windows and Ubuntu. The CLI should also run on Linux without 
 
 ## Artifacts
 
-Local packaging outputs go to `artifacts/` (ignored by git). Use `scripts/pack.ps1`
-or `scripts/pack.sh` to build, pack, and publish.
+Local packaging outputs go to `artifacts/` (ignored by git).
+
+Pack Xws.Core to NuGet:
+
+```
+scripts/pack.ps1
+# or
+./scripts/pack.sh
+```
+
+Outputs:
+
+- `artifacts/nuget/` for `Xws.Core.*.nupkg`
+
+Publish CLI:
+
+```
+scripts/publish.ps1
+# or
+./scripts/publish.sh
+```
+
+Outputs:
+
+- `artifacts/publish/win-x64`
+- `artifacts/publish/linux-x64`
+
+## CI (Offline-Safe)
+
+CI runs build/test on Windows + Linux without hitting live endpoints. A manual,
+allow-fail smoke job exists for live checks.
 
 ## Milestone 1
 
