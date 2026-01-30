@@ -70,14 +70,24 @@ placeCommand.SetHandler(async (string mode, bool armLive, string symbol, string 
         return;
     }
 
-    var client = new PaperExecutionClient();
-    var result = await client.PlaceAsync(new PlaceOrderRequest(
+    var request = new PlaceOrderRequest(
         symbol,
         orderSide,
         orderType,
         size,
         price,
-        clientOrderId), CancellationToken.None);
+        clientOrderId);
+
+    var idempotency = ExecutionSafety.ValidateIdempotency(config, request);
+    if (!idempotency.Ok)
+    {
+        Console.Error.WriteLine(idempotency.Error);
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    var client = new PaperExecutionClient();
+    var result = await client.PlaceAsync(request, CancellationToken.None);
 
     WriteJson(result);
 }, modeOption, armLiveOption, symbolOption, sideOption, typeOption, sizeOption, priceOption, clientOrderIdOption);
