@@ -39,7 +39,8 @@ public sealed record PlaceOrderResult(
 
 public sealed record CancelOrderRequest(
     string? OrderId = null,
-    string? ClientOrderId = null);
+    string? ClientOrderId = null,
+    string? Symbol = null);
 
 public sealed record CancelOrderResult(
     bool Success,

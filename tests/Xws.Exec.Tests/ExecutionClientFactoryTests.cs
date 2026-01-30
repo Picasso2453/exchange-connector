@@ -33,24 +33,24 @@ public sealed class ExecutionClientFactoryTests
 
     private sealed class FakeRest : IHyperliquidRest
     {
-        public Task<object?> PlaceAsync(PlaceOrderRequest request, ExecutionConfig config, CancellationToken cancellationToken)
+        public Task<HyperliquidPlaceResult> PlaceOrderAsync(PlaceOrderRequest request, ExecutionConfig config, CancellationToken cancellationToken)
         {
-            return Task.FromResult<object?>(null);
+            return Task.FromResult(new HyperliquidPlaceResult(null, null));
         }
 
-        public Task<object?> CancelAsync(CancelOrderRequest request, ExecutionConfig config, CancellationToken cancellationToken)
+        public Task<HyperliquidCancelResult> CancelOrderAsync(string orderId, string symbol, ExecutionConfig config, CancellationToken cancellationToken)
         {
-            return Task.FromResult<object?>(null);
+            return Task.FromResult(new HyperliquidCancelResult("success"));
         }
 
-        public Task<IReadOnlyList<object>> GetOpenOrdersAsync(ExecutionConfig config, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<HyperliquidOpenOrder>> GetOpenOrdersAsync(string address, ExecutionConfig config, CancellationToken cancellationToken)
         {
-            return Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
+            return Task.FromResult<IReadOnlyList<HyperliquidOpenOrder>>(Array.Empty<HyperliquidOpenOrder>());
         }
 
-        public Task<object?> CancelManyAsync(IReadOnlyList<string> orderIds, ExecutionConfig config, CancellationToken cancellationToken)
+        public Task<HyperliquidCancelResult> CancelManyAsync(IReadOnlyList<string> orderIds, ExecutionConfig config, CancellationToken cancellationToken)
         {
-            return Task.FromResult<object?>(null);
+            return Task.FromResult(new HyperliquidCancelResult("success"));
         }
     }
 }

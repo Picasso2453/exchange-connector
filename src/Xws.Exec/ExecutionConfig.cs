@@ -5,9 +5,8 @@ public sealed record ExecutionConfig(
     bool ArmLiveFlag,
     string? ArmEnvValue,
     string? UserAddress = null,
-    ExecutionCredentials? Credentials = null);
+    HyperliquidCredentials? HyperliquidCredentials = null);
 
-public sealed record ExecutionCredentials(
-    string? ApiKey = null,
-    string? ApiSecret = null,
-    string? ApiPassphrase = null);
+public sealed record HyperliquidCredentials(
+    string AccountAddress,
+    string PrivateKey);
