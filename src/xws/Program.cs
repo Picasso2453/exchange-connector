@@ -9,10 +9,15 @@ using xws.Core.Subscriptions;
 using xws.Core.WebSocket;
 using xws.Exchanges.Hyperliquid;
 using xws.Exchanges.Mexc;
+using xws.Config;
 
 Logger.Configure(Console.Error.WriteLine, Console.Error.WriteLine);
 
 var root = new RootCommand("xws CLI");
+var dotenvOption = new Option<string?>("--dotenv", "Load environment variables from a .env file");
+var noDotenvOption = new Option<bool>("--no-dotenv", "Disable loading .env files");
+root.AddGlobalOption(dotenvOption);
+root.AddGlobalOption(noDotenvOption);
 
 var muxMaxMessagesOption = new Option<int?>("--max-messages", "Stop after N JSONL messages (exit 0)");
 var muxTimeoutSecondsOption = new Option<int?>("--timeout-seconds", "Fail if max messages not reached within T seconds");
@@ -555,6 +560,37 @@ root.AddCommand(hlCommand);
 root.AddCommand(devCommand);
 root.AddCommand(mexcCommand);
 root.AddCommand(muxCommand);
+
+var parseResult = root.Parse(args);
+var noDotenv = parseResult.GetValueForOption(noDotenvOption);
+var dotenvPath = parseResult.GetValueForOption(dotenvOption);
+
+if (!noDotenv)
+{
+    if (!string.IsNullOrWhiteSpace(dotenvPath))
+    {
+        var result = DotEnvLoader.Load(dotenvPath, required: true);
+        if (!result.Loaded)
+        {
+            if (!string.IsNullOrWhiteSpace(result.Error))
+            {
+                Logger.Error(result.Error);
+            }
+            return 1;
+        }
+
+        Logger.Info($"Loaded .env from {dotenvPath}");
+    }
+    else
+    {
+        var defaultPath = Path.Combine(Environment.CurrentDirectory, ".env");
+        var result = DotEnvLoader.Load(defaultPath, required: false);
+        if (result.Loaded)
+        {
+            Logger.Info($"Loaded .env from {defaultPath}");
+        }
+    }
+}
 
 return await root.InvokeAsync(args);
 
