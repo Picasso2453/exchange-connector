@@ -1,0 +1,95 @@
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Channels;
+using xws.Core.Output;
+
+namespace xws.Exchanges.Mexc;
+
+public static class MexcFuturesL2Source
+{
+    private static readonly TimeSpan PingInterval = TimeSpan.FromSeconds(20);
+
+    public static async Task RunL2Async(
+        string[] symbols,
+        ChannelWriter<EnvelopeV1> writer,
+        CancellationToken cancellationToken)
+    {
+        if (symbols.Length == 0)
+        {
+            throw new InvalidOperationException("at least one symbol is required");
+        }
+
+        var config = MexcConfig.Load();
+        using var socket = new ClientWebSocket();
+        await socket.ConnectAsync(config.FuturesWsUri, cancellationToken);
+
+        foreach (var symbol in symbols)
+        {
+            var payload = new
+            {
+                method = "sub.depth",
+                param = new { symbol }
+            };
+
+            var json = JsonSerializer.Serialize(payload);
+            var bytes = Encoding.UTF8.GetBytes(json);
+            await socket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
+        }
+
+        using var pingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var pingTask = Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(PingInterval);
+            while (await timer.WaitForNextTickAsync(pingCts.Token))
+            {
+                var pingPayload = Encoding.UTF8.GetBytes("{\"method\":\"ping\"}");
+                await socket.SendAsync(pingPayload, WebSocketMessageType.Text, true, pingCts.Token);
+            }
+        }, pingCts.Token);
+
+        var buffer = new byte[8192];
+        while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
+        {
+            var segment = new ArraySegment<byte>(buffer);
+            using var messageBuffer = new MemoryStream();
+            WebSocketReceiveResult result;
+            do
+            {
+                result = await socket.ReceiveAsync(segment, cancellationToken);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    pingCts.Cancel();
+                    await pingTask;
+                    return;
+                }
+
+                messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
+            }
+            while (!result.EndOfMessage);
+
+            if (result.MessageType != WebSocketMessageType.Text)
+            {
+                continue;
+            }
+
+            var text = Encoding.UTF8.GetString(messageBuffer.ToArray());
+            if (string.Equals(text, "pong", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (MexcFuturesL2Decoder.TryBuildEnvelope(text, symbols, out var envelope))
+            {
+                await writer.WriteAsync(envelope, cancellationToken);
+            }
+            else
+            {
+                Logger.Info($"mexc fut text frame: {text}");
+            }
+        }
+
+        pingCts.Cancel();
+        await pingTask;
+    }
+}
