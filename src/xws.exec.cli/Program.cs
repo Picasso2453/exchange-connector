@@ -33,6 +33,15 @@ placeCommand.SetHandler(async (string mode, bool armLive, string symbol, string 
         return;
     }
 
+    var config = BuildConfig(execMode, armLive);
+    var arming = ExecutionSafety.ValidateArming(config);
+    if (!arming.Ok)
+    {
+        Console.Error.WriteLine(arming.Error);
+        Environment.ExitCode = 1;
+        return;
+    }
+
     if (!TryParseSide(side, out var orderSide))
     {
         Console.Error.WriteLine("invalid --side");
@@ -89,6 +98,15 @@ cancelCommand.SetHandler(async (string mode, bool armLive, string orderId) =>
         return;
     }
 
+    var config = BuildConfig(execMode, armLive);
+    var arming = ExecutionSafety.ValidateArming(config);
+    if (!arming.Ok)
+    {
+        Console.Error.WriteLine(arming.Error);
+        Environment.ExitCode = 1;
+        return;
+    }
+
     if (execMode != ExecutionMode.Paper)
     {
         Console.Error.WriteLine("mode not implemented yet");
@@ -114,6 +132,15 @@ cancelAllCommand.SetHandler(async (string mode, bool armLive, string? symbol) =>
     if (!TryParseMode(mode, out var execMode))
     {
         Console.Error.WriteLine("invalid --mode");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    var config = BuildConfig(execMode, armLive);
+    var arming = ExecutionSafety.ValidateArming(config);
+    if (!arming.Ok)
+    {
+        Console.Error.WriteLine(arming.Error);
         Environment.ExitCode = 1;
         return;
     }
@@ -201,4 +228,10 @@ static void WriteJson<T>(T payload)
 {
     var line = JsonSerializer.Serialize(payload);
     Console.Out.WriteLine(line);
+}
+
+static ExecutionConfig BuildConfig(ExecutionMode mode, bool armLiveFlag)
+{
+    var armEnv = Environment.GetEnvironmentVariable("XWS_EXEC_ARM");
+    return new ExecutionConfig(mode, armLiveFlag, armEnv);
 }
