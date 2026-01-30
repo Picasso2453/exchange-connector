@@ -66,6 +66,24 @@ dotnet run --project src/xws -- subscribe trades \
   --sub hl=SOL \
   --sub mexc.spot=BTCUSDT,ETHUSDT \
   --max-messages 50 --timeout-seconds 30
+
+# MEXC futures trades (market key: mexc.fut, symbol format: BTC_USDT)
+dotnet run --project src/xws -- subscribe trades \
+  --sub mexc.fut=BTC_USDT \
+  --max-messages 10 --timeout-seconds 15
+```
+
+### mux subscribe l2 (envelope default)
+
+Run L2 orderbook streams via mux and emit envelope JSONL.
+
+Examples:
+
+```
+# MEXC futures L2 (market key: mexc.fut, symbol format: BTC_USDT)
+dotnet run --project src/xws -- subscribe l2 \
+  --sub mexc.fut=BTC_USDT \
+  --max-messages 5 --timeout-seconds 15
 ```
 
 ## IO Contract
