@@ -10,5 +10,9 @@ public sealed class FixtureReplayTests
         var lines = FixtureLoader.LoadLines("sample-envelope.jsonl");
 
         Assert.NotEmpty(lines);
+        foreach (var line in lines)
+        {
+            EnvelopeAssertions.AssertEnvelopeJsonLine(line, "mexc", "trades", "BTCUSDT");
+        }
     }
 }
