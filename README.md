@@ -184,6 +184,9 @@ scripts/pack.ps1
 ./scripts/pack.sh
 ```
 
+Note: on Windows, the `.sh` scripts require WSL. Use the `.ps1` scripts if WSL
+is not installed.
+
 Outputs:
 
 - `artifacts/nuget/` for `Xws.Core.*.nupkg`
