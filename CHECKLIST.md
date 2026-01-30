@@ -34,5 +34,5 @@
 - [x] Exec CLI JSONL stdout contract
 - [x] Mainnet arming + idempotency guards
 - [x] Hyperliquid live place/cancel/cancel-all (offline-safe tests)
-- [ ] Docs updated
-- [ ] Version bump + tag v0.6.0
+- [x] Docs updated
+- [x] Version bump + tag v0.6.0
