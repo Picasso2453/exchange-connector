@@ -27,3 +27,10 @@
 
 - MEXC futures supported via mux using market key `mexc.fut`.
 - Mux supports `subscribe l2` for orderbook streams (envelope JSONL).
+
+## Milestone 5 (Draft)
+
+- CLI loads .env by default only if present; `--no-dotenv` disables.
+- `--dotenv <path>` requires the file to exist or exits non-zero.
+- Process env vars take precedence; dotenv fills missing values only.
+- Xws.Core remains pure (no env/dotenv loading).
