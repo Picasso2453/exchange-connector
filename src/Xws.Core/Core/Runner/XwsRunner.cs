@@ -103,4 +103,29 @@ public sealed class XwsRunner
             Output.Complete();
         }
     }
+
+    public async Task<int> RunMuxL2Async(IReadOnlyCollection<MuxSubscription> subscriptions, MuxRunnerOptions options, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var runner = new MuxRunner(new JsonlWriter(line => Output.Writer.TryWrite(line)));
+            var producers = subscriptions.Select(sub => (Func<System.Threading.Channels.ChannelWriter<EnvelopeV1>, CancellationToken, Task>)(async (writer, token) =>
+            {
+                if (sub.Exchange.Equals("mexc", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(sub.Market, "fut", StringComparison.OrdinalIgnoreCase))
+                {
+                    await MexcFuturesL2Source.RunL2Async(sub.Symbols, writer, token);
+                    return;
+                }
+
+                Logger.Error($"unsupported mux exchange: {sub.Exchange}");
+            })).ToList();
+
+            return await runner.RunAsync(producers, options, cancellationToken);
+        }
+        finally
+        {
+            Output.Complete();
+        }
+    }
 }
