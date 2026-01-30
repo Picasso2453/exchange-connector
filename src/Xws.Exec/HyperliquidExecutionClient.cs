@@ -1,3 +1,5 @@
+using System.Linq;
+
 namespace Xws.Exec;
 
 public sealed class HyperliquidExecutionClient : IExecutionClient
@@ -82,7 +84,20 @@ public sealed class HyperliquidExecutionClient : IExecutionClient
 
     public Task<CancelAllResult> CancelAllAsync(CancelAllRequest request, CancellationToken cancellationToken)
     {
-        throw new NotSupportedException("Hyperliquid execution not implemented in slice 6");
+        if (_config.Mode == ExecutionMode.Mainnet)
+        {
+            var arming = ExecutionSafety.ValidateArming(_config);
+            if (!arming.Ok)
+            {
+                return Task.FromResult(new CancelAllResult(
+                    false,
+                    0,
+                    _config.Mode,
+                    arming.Error));
+            }
+        }
+
+        return CancelAllInternalAsync(request, cancellationToken);
     }
 
     private async Task<PlaceOrderResult> PlaceInternalAsync(PlaceOrderRequest request, CancellationToken cancellationToken)
@@ -105,5 +120,52 @@ public sealed class HyperliquidExecutionClient : IExecutionClient
             null,
             _config.Mode,
             result.Raw ?? result.Status);
+    }
+
+    private async Task<CancelAllResult> CancelAllInternalAsync(CancelAllRequest request, CancellationToken cancellationToken)
+    {
+        var address = _config.UserAddress ?? _config.HyperliquidCredentials?.AccountAddress;
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            return new CancelAllResult(false, 0, _config.Mode, "account address required");
+        }
+
+        var openOrders = await _rest.GetOpenOrdersAsync(address, _config, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(request.Symbol))
+        {
+            openOrders = openOrders
+                .Where(order => string.Equals(order.Symbol, request.Symbol, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+        }
+
+        if (openOrders.Count == 0)
+        {
+            return new CancelAllResult(true, 0, _config.Mode);
+        }
+
+        var cancelled = 0;
+        foreach (var order in openOrders)
+        {
+            if (string.IsNullOrWhiteSpace(order.OrderId))
+            {
+                return new CancelAllResult(false, cancelled, _config.Mode, "orderId required");
+            }
+
+            if (string.IsNullOrWhiteSpace(order.Symbol))
+            {
+                return new CancelAllResult(false, cancelled, _config.Mode, "symbol required");
+            }
+
+            var result = await _rest.CancelOrderAsync(order.OrderId, order.Symbol, _config, cancellationToken);
+            var ok = string.Equals(result.Status, "success", StringComparison.OrdinalIgnoreCase);
+            if (!ok)
+            {
+                return new CancelAllResult(false, cancelled, _config.Mode, result.Raw ?? result.Status);
+            }
+
+            cancelled++;
+        }
+
+        return new CancelAllResult(true, cancelled, _config.Mode);
     }
 }
