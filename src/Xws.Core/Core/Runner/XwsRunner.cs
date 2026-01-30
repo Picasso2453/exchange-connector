@@ -78,11 +78,19 @@ public sealed class XwsRunner
                     return;
                 }
 
-                if (sub.Exchange.Equals("mexc", StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(sub.Market, "spot", StringComparison.OrdinalIgnoreCase))
+                if (sub.Exchange.Equals("mexc", StringComparison.OrdinalIgnoreCase))
                 {
-                    await MexcSpotMuxSource.RunTradesAsync(sub.Symbols, writer, token);
-                    return;
+                    if (string.Equals(sub.Market, "spot", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await MexcSpotMuxSource.RunTradesAsync(sub.Symbols, writer, token);
+                        return;
+                    }
+
+                    if (string.Equals(sub.Market, "fut", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await MexcFuturesTradeSource.RunTradesAsync(sub.Symbols, writer, token);
+                        return;
+                    }
                 }
 
                 Logger.Error($"unsupported mux exchange: {sub.Exchange}");
