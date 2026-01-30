@@ -5,6 +5,12 @@ on:
     branches: [milestone-3]
   pull_request:
     branches: [milestone-3]
+  workflow_dispatch:
+    inputs:
+      run_smoke:
+        description: 'Run live smoke checks (allow-fail)'
+        required: false
+        default: 'false'
 
 jobs:
   build:
@@ -24,3 +30,20 @@ jobs:
         run: dotnet build -c Release --no-restore
       - name: Test
         run: dotnet test -c Release --no-build
+
+  smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_smoke == 'true' }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore
+      - name: Build
+        run: dotnet build -c Release --no-restore
+      - name: Smoke (HL trades)
+        run: dotnet run --project src/xws -- hl subscribe trades --symbol SOL --max-messages 5 --timeout-seconds 15 --format envelope
