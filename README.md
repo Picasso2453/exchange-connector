@@ -6,6 +6,13 @@ xws is a raw, scriptable WebSocket pump that emits JSONL to stdout. It targets
 engineers and quants who want exchange-native data with minimal processing and
 deterministic CLI behavior.
 
+## Architecture / Modules
+
+- `Xws.Core`: receiver runtime (adapters, mux runner, JSONL formatting).
+- `xws`: receiver CLI (market data only).
+- `Xws.Exec`: execution library (no console IO).
+- `xws.exec.cli`: thin execution CLI (Windows-safe name to avoid case collisions).
+
 ## Goals
 
 - Emit JSONL streams suitable for piping into other tools.
@@ -16,13 +23,34 @@ deterministic CLI behavior.
 ## Non-Goals
 
 - Normalized cross-exchange schemas.
-- Trading actions (place/cancel), signing, or key management.
+- Trading actions inside the receiver (`xws`) or `Xws.Core`.
 - Local persistence or stateful order management.
 
-## Execution (WIP)
+## Execution
 
-An execution module (`Xws.Exec`) is being added in Milestone 6 for safe
-place/cancel flows. It is library-first and does not change receiver behavior.
+`Xws.Exec` is a library-first execution module (separate from the receiver).
+`xws.exec.cli` is a thin wrapper that emits JSONL to stdout.
+
+Modes:
+
+- `paper` (default, deterministic, offline)
+- `testnet`
+- `mainnet`
+
+Safety gates (mainnet only):
+
+- requires `--arm-live`
+- requires `XWS_EXEC_ARM=1`
+- requires `--client-order-id`
+
+Examples (paper mode):
+
+```
+dotnet run --project src/xws.exec.cli -- place --mode paper --symbol HYPE --side buy --type market --size 1
+dotnet run --project src/xws.exec.cli -- place --mode paper --symbol HYPE --side buy --type limit --size 1 --price 1.23
+dotnet run --project src/xws.exec.cli -- cancel --mode paper --order-id 1
+dotnet run --project src/xws.exec.cli -- cancel-all --mode paper
+```
 
 ## Commands
 
@@ -137,6 +165,12 @@ dotnet run --project src/xws -- dev emit --count 5 --timeout-seconds 5
 - XWS_HL_HTTP_URL (optional override)
 - XWS_MEXC_SPOT_WS_URL (optional override)
 - XWS_MEXC_FUT_WS_URL (optional override; scaffold only)
+- XWS_EXEC_ARM (required for mainnet execution; must be exactly `1`)
+
+Execution credentials:
+
+- `xws.exec.cli` does not define env var names for Hyperliquid credentials yet.
+  Hosts can pass credentials directly to `Xws.Exec` via `ExecutionConfig`.
 
 ## Connectivity Note (MEXC)
 

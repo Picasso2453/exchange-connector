@@ -34,3 +34,11 @@
 - `--dotenv <path>` requires the file to exist or exits non-zero.
 - Process env vars take precedence; dotenv fills missing values only.
 - Xws.Core remains pure (no env/dotenv loading).
+
+## Milestone 6 (2026-01-30)
+
+- Execution split: `Xws.Exec` library + `xws.exec.cli` thin wrapper.
+- Modes: `paper` default; `testnet` and `mainnet` supported in library.
+- Mainnet arming rule: requires `--arm-live` and `XWS_EXEC_ARM=1` (fail-closed).
+- Idempotency rule: `clientOrderId` required for mainnet.
+- Windows-safe CLI name: `xws.exec.cli` to avoid case-insensitive collisions.
