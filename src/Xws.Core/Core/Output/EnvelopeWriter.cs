@@ -9,13 +9,15 @@ public sealed class EnvelopeWriter : IJsonlWriter
     private readonly string _stream;
     private readonly string? _market;
     private readonly string[]? _symbols;
+    private readonly Action<string> _emit;
 
-    public EnvelopeWriter(string exchange, string stream, string? market, string[]? symbols)
+    public EnvelopeWriter(string exchange, string stream, string? market, string[]? symbols, Action<string> emit)
     {
         _exchange = exchange;
         _stream = stream;
         _market = market;
         _symbols = symbols;
+        _emit = emit ?? throw new ArgumentNullException(nameof(emit));
     }
 
     public void WriteLine(string message)
@@ -54,7 +56,7 @@ public sealed class EnvelopeWriter : IJsonlWriter
             rawEncoding);
 
         var line = JsonSerializer.Serialize(envelope);
-        Console.Out.WriteLine(line);
+        _emit(line);
     }
 
     public void WriteRawObject(object rawObject)
@@ -71,6 +73,6 @@ public sealed class EnvelopeWriter : IJsonlWriter
             "json");
 
         var line = JsonSerializer.Serialize(envelope);
-        Console.Out.WriteLine(line);
+        _emit(line);
     }
 }

@@ -20,7 +20,7 @@ public static class HyperliquidMuxSource
             registry.Add(HyperliquidWs.BuildTradesSubscription(symbol));
         }
 
-        var runner = new WebSocketRunner(new JsonlWriter(), registry);
+        var runner = new WebSocketRunner(new JsonlWriter(_ => { }), registry);
         var options = new WebSocketRunnerOptions
         {
             MaxMessages = null,

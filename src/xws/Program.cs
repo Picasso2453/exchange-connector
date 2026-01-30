@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Threading.Channels;
 using xws.Core.Dev;
 using xws.Core.Env;
 using xws.Core.Mux;
@@ -8,6 +9,8 @@ using xws.Core.Subscriptions;
 using xws.Core.WebSocket;
 using xws.Exchanges.Hyperliquid;
 using xws.Exchanges.Mexc;
+
+Logger.Configure(Console.Error.WriteLine, Console.Error.WriteLine);
 
 var root = new RootCommand("xws CLI");
 
@@ -24,7 +27,7 @@ var devCountOption = new Option<int>("--count", "Number of lines to emit")
 var devTimeoutSecondsOption = new Option<int?>("--timeout-seconds", "Fail if not finished within T seconds");
 devEmitCommand.AddOption(devCountOption);
 devEmitCommand.AddOption(devTimeoutSecondsOption);
-devEmitCommand.SetHandler((int count, int? timeoutSeconds) =>
+devEmitCommand.SetHandler(async (int count, int? timeoutSeconds) =>
 {
     if (count <= 0)
     {
@@ -37,19 +40,25 @@ devEmitCommand.SetHandler((int count, int? timeoutSeconds) =>
         ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds.Value))
         : new CancellationTokenSource();
 
-    var writer = new JsonlWriter();
+    var output = new OutputChannel();
+    var writerTask = WriteOutputAsync(output.Reader, cts.Token);
     try
     {
         foreach (var line in DevEmitter.BuildLines(count))
         {
             cts.Token.ThrowIfCancellationRequested();
-            writer.WriteLine(line);
+            output.Writer.TryWrite(line);
         }
     }
     catch (OperationCanceledException)
     {
         Logger.Error("dev emit timeout reached");
         Environment.ExitCode = 1;
+    }
+    finally
+    {
+        output.Complete();
+        await writerTask;
     }
 }, devCountOption, devTimeoutSecondsOption);
 devCommand.AddCommand(devEmitCommand);
@@ -118,9 +127,10 @@ mexcTradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeou
         return;
     }
 
+    var runner = new XwsRunner();
+    var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
     try
     {
-        var runner = new XwsRunner();
         var exitCode = await runner.RunMexcSpotTradesAsync(
             symbols,
             maxMessages,
@@ -132,6 +142,10 @@ mexcTradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeou
     {
         Logger.Error($"mexc spot subscribe trades failed: {ex.Message}");
         Environment.ExitCode = 1;
+    }
+    finally
+    {
+        await writerTask;
     }
 }, mexcSymbolOption, muxMaxMessagesOption, muxTimeoutSecondsOption);
 
@@ -218,9 +232,22 @@ muxTradesCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeout
     };
 
     var runner = new XwsRunner();
-    var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
-    var exitCode = await runner.RunMuxTradesAsync(muxSubs, options, cts.Token);
-    Environment.ExitCode = exitCode;
+    var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+    try
+    {
+        var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
+        var exitCode = await runner.RunMuxTradesAsync(muxSubs, options, cts.Token);
+        Environment.ExitCode = exitCode;
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"mux subscribe trades failed: {ex.Message}");
+        Environment.ExitCode = 1;
+    }
+    finally
+    {
+        await writerTask;
+    }
 }, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
 
 muxCommand.AddCommand(muxTradesCommand);
@@ -230,7 +257,9 @@ var symbolsFilterOption = new Option<string?>("--filter", "Filter by substring")
 hlSymbolsCommand.AddOption(symbolsFilterOption);
 hlSymbolsCommand.SetHandler(async (string? filter) =>
 {
-    var writer = new JsonlWriter();
+    var output = new OutputChannel();
+    var writerTask = WriteOutputAsync(output.Reader, CancellationToken.None);
+    var writer = new JsonlWriter(line => output.Writer.TryWrite(line));
 
     try
     {
@@ -253,6 +282,11 @@ hlSymbolsCommand.SetHandler(async (string? filter) =>
     {
         Logger.Error($"hl symbols failed: {ex.Message}");
         Environment.ExitCode = 1;
+    }
+    finally
+    {
+        output.Complete();
+        await writerTask;
     }
 }, symbolsFilterOption);
 
@@ -312,9 +346,10 @@ tradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeoutSec
         return;
     }
 
+    var runner = new XwsRunner();
+    var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
     try
     {
-        var runner = new XwsRunner();
         var options = new WebSocketRunnerOptions
         {
             MaxMessages = maxMessages,
@@ -328,6 +363,10 @@ tradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeoutSec
     {
         Logger.Error($"hl subscribe trades failed: {ex.Message}");
         Environment.ExitCode = 1;
+    }
+    finally
+    {
+        await writerTask;
     }
 }, tradesSymbolOption, maxMessagesOption, timeoutSecondsOption, formatOption);
 
@@ -385,9 +424,10 @@ positionsCommand.SetHandler(async (int? maxMessages, int? timeoutSeconds, string
         return;
     }
 
+    var runner = new XwsRunner();
+    var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
     try
     {
-        var runner = new XwsRunner();
         var options = new WebSocketRunnerOptions
         {
             MaxMessages = maxMessages,
@@ -401,6 +441,10 @@ positionsCommand.SetHandler(async (int? maxMessages, int? timeoutSeconds, string
     {
         Logger.Error($"hl subscribe positions failed: {ex.Message}");
         Environment.ExitCode = 1;
+    }
+    finally
+    {
+        await writerTask;
     }
 }, maxMessagesOption, timeoutSecondsOption, formatOption);
 
@@ -477,6 +521,20 @@ static bool TryParseSub(string input, out ParsedSub parsed)
 
     parsed = new ParsedSub(exchange, market, symbols);
     return true;
+}
+
+static async Task WriteOutputAsync(ChannelReader<string> reader, CancellationToken cancellationToken)
+{
+    try
+    {
+        await foreach (var line in reader.ReadAllAsync(cancellationToken))
+        {
+            Console.Out.WriteLine(line);
+        }
+    }
+    catch (OperationCanceledException)
+    {
+    }
 }
 
 sealed record ParsedSub(string Exchange, string? Market, string[] Symbols);

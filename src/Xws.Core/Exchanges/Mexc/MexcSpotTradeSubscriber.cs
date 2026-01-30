@@ -1,6 +1,7 @@
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Channels;
 using Google.Protobuf;
 using xws.Core.Output;
 
@@ -16,8 +17,11 @@ public sealed class MexcSpotTradeSubscriber
         string[] symbols,
         int? maxMessages,
         TimeSpan? timeout,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ChannelWriter<string> output)
     {
+        ArgumentNullException.ThrowIfNull(output);
+
         if (symbols.Length == 0)
         {
             throw new InvalidOperationException("at least one symbol is required");
@@ -48,7 +52,12 @@ public sealed class MexcSpotTradeSubscriber
         var bytes = Encoding.UTF8.GetBytes(json);
         await socket.SendAsync(bytes, WebSocketMessageType.Text, true, runToken);
 
-        var writer = new EnvelopeWriter("mexc", "trades", "spot", symbols);
+        var writer = new EnvelopeWriter(
+            "mexc",
+            "trades",
+            "spot",
+            symbols,
+            line => output.TryWrite(line));
         var buffer = new byte[8192];
         var messageCount = 0;
 
