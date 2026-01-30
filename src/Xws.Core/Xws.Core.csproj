@@ -8,6 +8,7 @@
     <Description>Core runtime for xws: exchange adapters, mux runner, and JSONL formatting.</Description>
     <PackageTags>websocket;jsonl;trading;exchange</PackageTags>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +23,10 @@
     <Protobuf Include="Exchanges/Mexc/Proto/*.proto" GrpcServices="None" ProtoRoot="Exchanges/Mexc/Proto">
       <CsharpNamespace>Xws.Exchanges.Mexc.Proto</CsharpNamespace>
     </Protobuf>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
 </Project>
