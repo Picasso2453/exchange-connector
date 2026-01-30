@@ -4,6 +4,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <PackageId>Xws.Core</PackageId>
+    <Description>Core runtime for xws: exchange adapters, mux runner, and JSONL formatting.</Description>
+    <PackageTags>websocket;jsonl;trading;exchange</PackageTags>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
   </PropertyGroup>
 
   <ItemGroup>
