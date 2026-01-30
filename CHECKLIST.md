@@ -18,3 +18,11 @@
 - [x] MEXC futures L2 (mux + fixtures)
 - [x] Docs updated
 - [x] Tag v0.4.0 pushed
+
+## Milestone 5 (Draft)
+
+- [x] Bootstrap complete
+- [x] Dotenv loader + flags
+- [x] Dotenv tests
+- [x] README updated
+- [x] Version bump + tag v0.5.0
