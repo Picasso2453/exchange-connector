@@ -854,7 +854,13 @@ hlSymbolsCommand.SetHandler(async (string? filter) =>
 var hlSubscribeCommand = new Command("subscribe", "Subscribe to Hyperliquid streams");
 
 var tradesCommand = new Command("trades", "Subscribe to trades stream");
+var l2Command = new Command("l2", "Subscribe to L2 orderbook stream");
+var candleCommand = new Command("candle", "Subscribe to candle (OHLCV) stream");
 var tradesSymbolOption = new Option<string>("--symbol", "Native coin symbol")
+{
+    IsRequired = true
+};
+var candleIntervalOption = new Option<string>("--interval", "Candle interval (e.g., 1m, 5m, 15m, 1h, 4h, 1d)")
 {
     IsRequired = true
 };
@@ -938,6 +944,163 @@ tradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeoutSec
         Environment.ExitCode = 2;
     }
 }, tradesSymbolOption, maxMessagesOption, timeoutSecondsOption, formatOption);
+
+l2Command.AddOption(tradesSymbolOption);
+l2Command.AddOption(maxMessagesOption);
+l2Command.AddOption(timeoutSecondsOption);
+l2Command.AddOption(formatOption);
+l2Command.SetHandler(async (string symbol, int? maxMessages, int? timeoutSeconds, string format) =>
+{
+    try
+    {
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
+        };
+
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (!IsValidFormat(format))
+        {
+            Logger.Error("--format must be envelope or raw");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var options = new WebSocketRunnerOptions
+            {
+                MaxMessages = maxMessages,
+                Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+            };
+
+            var exitCode = await runner.RunHlL2Async(symbol, options, format, cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"hl subscribe l2 failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"hl subscribe l2 failed: {ex.Message}");
+        Environment.ExitCode = 2;
+    }
+}, tradesSymbolOption, maxMessagesOption, timeoutSecondsOption, formatOption);
+
+candleCommand.AddOption(tradesSymbolOption);
+candleCommand.AddOption(candleIntervalOption);
+candleCommand.AddOption(maxMessagesOption);
+candleCommand.AddOption(timeoutSecondsOption);
+candleCommand.AddOption(formatOption);
+candleCommand.SetHandler(async (string symbol, string interval, int? maxMessages, int? timeoutSeconds, string format) =>
+{
+    try
+    {
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
+        };
+
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (!IsValidFormat(format))
+        {
+            Logger.Error("--format must be envelope or raw");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var options = new WebSocketRunnerOptions
+            {
+                MaxMessages = maxMessages,
+                Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+            };
+
+            var exitCode = await runner.RunHlCandleAsync(symbol, interval, options, format, cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"hl subscribe candle failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"hl subscribe candle failed: {ex.Message}");
+        Environment.ExitCode = 2;
+    }
+}, tradesSymbolOption, candleIntervalOption, maxMessagesOption, timeoutSecondsOption, formatOption);
 
 var positionsCommand = new Command("positions", "Subscribe to positions/account stream");
 positionsCommand.AddOption(maxMessagesOption);
@@ -1026,6 +1189,8 @@ positionsCommand.SetHandler(async (int? maxMessages, int? timeoutSeconds, string
 }, maxMessagesOption, timeoutSecondsOption, formatOption);
 
 hlSubscribeCommand.AddCommand(tradesCommand);
+hlSubscribeCommand.AddCommand(l2Command);
+hlSubscribeCommand.AddCommand(candleCommand);
 hlSubscribeCommand.AddCommand(positionsCommand);
 
 hlCommand.AddCommand(hlSymbolsCommand);

@@ -15,6 +15,7 @@ var typeOption = new Option<string>("--type") { IsRequired = true };
 var sizeOption = new Option<decimal>("--size") { IsRequired = true };
 var priceOption = new Option<decimal?>("--price");
 var clientOrderIdOption = new Option<string?>("--client-order-id");
+var reduceOnlyOption = new Option<bool>("--reduce-only", "Reduce only (close or reduce existing position)");
 
 placeCommand.AddOption(modeOption);
 placeCommand.AddOption(armLiveOption);
@@ -25,6 +26,7 @@ placeCommand.AddOption(typeOption);
 placeCommand.AddOption(sizeOption);
 placeCommand.AddOption(priceOption);
 placeCommand.AddOption(clientOrderIdOption);
+placeCommand.AddOption(reduceOnlyOption);
 
 placeCommand.SetHandler(async context =>
 {
@@ -39,6 +41,7 @@ placeCommand.SetHandler(async context =>
         var size = context.ParseResult.GetValueForOption(sizeOption);
         var price = context.ParseResult.GetValueForOption(priceOption);
         var clientOrderId = context.ParseResult.GetValueForOption(clientOrderIdOption);
+        var reduceOnly = context.ParseResult.GetValueForOption(reduceOnlyOption);
 
         if (!TryParseMode(mode, out var execMode))
         {
@@ -97,7 +100,8 @@ placeCommand.SetHandler(async context =>
             orderType,
             size,
             price,
-            clientOrderId);
+            clientOrderId,
+            reduceOnly);
 
         var idempotency = ExecutionSafety.ValidateIdempotency(config, request);
         if (!idempotency.Ok)

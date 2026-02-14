@@ -34,6 +34,46 @@ public sealed class XwsRunner
         }
     }
 
+    public async Task<int> RunHlL2Async(string symbol, WebSocketRunnerOptions options, string format, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var config = HyperliquidConfig.Load();
+            var subscription = HyperliquidWs.BuildL2BookSubscription(symbol);
+            IJsonlWriter writer = format == "raw"
+                ? new JsonlWriter(line => Output.Writer.TryWrite(line))
+                : new EnvelopeWriter("hl", "l2", null, new[] { symbol }, line => Output.Writer.TryWrite(line));
+            var registry = new SubscriptionRegistry();
+            registry.Add(subscription);
+            var runner = new WebSocketRunner(writer, registry);
+            return await runner.RunAsync(config.WsUri, options, cancellationToken);
+        }
+        finally
+        {
+            Output.Complete();
+        }
+    }
+
+    public async Task<int> RunHlCandleAsync(string symbol, string interval, WebSocketRunnerOptions options, string format, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var config = HyperliquidConfig.Load();
+            var subscription = HyperliquidWs.BuildCandleSubscription(symbol, interval);
+            IJsonlWriter writer = format == "raw"
+                ? new JsonlWriter(line => Output.Writer.TryWrite(line))
+                : new EnvelopeWriter("hl", "candle", null, new[] { symbol }, line => Output.Writer.TryWrite(line));
+            var registry = new SubscriptionRegistry();
+            registry.Add(subscription);
+            var runner = new WebSocketRunner(writer, registry);
+            return await runner.RunAsync(config.WsUri, options, cancellationToken);
+        }
+        finally
+        {
+            Output.Complete();
+        }
+    }
+
     public async Task<int> RunHlPositionsAsync(string user, WebSocketRunnerOptions options, string format, CancellationToken cancellationToken)
     {
         try

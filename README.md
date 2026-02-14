@@ -99,6 +99,32 @@ Expected output (JSONL):
 {"status":1,"orderId":"000001","clientOrderId":"demo-hl-001","mode":0}
 ```
 
+## Windows Examples (Hyperliquid)
+
+Get bid/ask levels (L2) and size:
+
+```
+dotnet run --project src/xws -- hl subscribe l2 --symbol SOL --max-messages 10 --timeout-seconds 30
+```
+
+Get OHLCV candles:
+
+```
+dotnet run --project src/xws -- hl subscribe candle --symbol SOL --interval 1m --max-messages 10 --timeout-seconds 30
+```
+
+Send a market buy:
+
+```
+dotnet run --project src/xws.exec.cli -- place --mode paper --exchange hl --symbol SOL --side buy --type market --size 1 --client-order-id buy-001
+```
+
+Close a trade (reduce-only market sell):
+
+```
+dotnet run --project src/xws.exec.cli -- place --mode paper --exchange hl --symbol SOL --side sell --type market --size 1 --reduce-only --client-order-id close-001
+```
+
 ## Commands
 
 ### hl symbols
@@ -122,6 +148,26 @@ Examples:
 dotnet run --project src/xws -- hl subscribe trades --symbol SOL
 dotnet run --project src/xws -- hl subscribe trades --symbol SOL --max-messages 50 --timeout-seconds 30
 dotnet run --project src/xws -- hl subscribe trades --symbol SOL --format raw --max-messages 10 --timeout-seconds 30
+```
+
+### hl subscribe l2
+
+Stream L2 orderbook updates (bid/ask levels with size).
+
+Examples (PowerShell):
+
+```
+dotnet run --project src/xws -- hl subscribe l2 --symbol SOL --max-messages 10 --timeout-seconds 30
+```
+
+### hl subscribe candle
+
+Stream candle (OHLCV) updates.
+
+Examples (PowerShell):
+
+```
+dotnet run --project src/xws -- hl subscribe candle --symbol SOL --interval 1m --max-messages 10 --timeout-seconds 30
 ```
 
 ### hl subscribe positions

@@ -24,6 +24,39 @@ public static class HyperliquidWs
         return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
     }
 
+    public static SubscriptionRequest BuildL2BookSubscription(string symbol)
+    {
+        var payload = new
+        {
+            method = "subscribe",
+            subscription = new
+            {
+                type = "l2Book",
+                coin = symbol
+            }
+        };
+
+        var key = new SubscriptionKey("l2Book", $"coin={symbol}");
+        return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
+    }
+
+    public static SubscriptionRequest BuildCandleSubscription(string symbol, string interval)
+    {
+        var payload = new
+        {
+            method = "subscribe",
+            subscription = new
+            {
+                type = "candle",
+                coin = symbol,
+                interval
+            }
+        };
+
+        var key = new SubscriptionKey("candle", $"coin={symbol};interval={interval}");
+        return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
+    }
+
     public static SubscriptionRequest BuildClearinghouseStateSubscription(string user)
     {
         var payload = new
