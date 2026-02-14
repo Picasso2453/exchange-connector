@@ -100,6 +100,26 @@ public sealed class HyperliquidExecutionClient : IExecutionClient
         return CancelAllInternalAsync(request, cancellationToken);
     }
 
+    public Task<AmendOrderResult> AmendAsync(AmendOrderRequest request, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(new AmendOrderResult(
+            OrderStatus.Rejected,
+            request.OrderId,
+            request.ClientOrderId,
+            _config.Mode,
+            "amend not implemented"));
+    }
+
+    public Task<QueryOrdersResult> QueryOrdersAsync(QueryOrdersRequest request, CancellationToken cancellationToken)
+    {
+        return Task.FromResult(new QueryOrdersResult(_config.Mode, Array.Empty<OrderState>(), "query orders not implemented"));
+    }
+
+    public Task<QueryPositionsResult> QueryPositionsAsync(CancellationToken cancellationToken)
+    {
+        return Task.FromResult(new QueryPositionsResult(_config.Mode, Array.Empty<PositionState>(), "query positions not implemented"));
+    }
+
     private async Task<PlaceOrderResult> PlaceInternalAsync(PlaceOrderRequest request, CancellationToken cancellationToken)
     {
         var result = await _rest.PlaceOrderAsync(request, _config, cancellationToken);

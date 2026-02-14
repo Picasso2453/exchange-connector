@@ -46,10 +46,57 @@ Safety gates (mainnet only):
 Examples (paper mode):
 
 ```
-dotnet run --project src/xws.exec.cli -- place --mode paper --symbol HYPE --side buy --type market --size 1
-dotnet run --project src/xws.exec.cli -- place --mode paper --symbol HYPE --side buy --type limit --size 1 --price 1.23
-dotnet run --project src/xws.exec.cli -- cancel --mode paper --order-id 1
-dotnet run --project src/xws.exec.cli -- cancel-all --mode paper
+dotnet run --project src/xws.exec.cli -- place --mode paper --exchange hl --symbol HYPE --side buy --type market --size 1
+dotnet run --project src/xws.exec.cli -- place --mode paper --exchange hl --symbol HYPE --side buy --type limit --size 1 --price 1.23
+dotnet run --project src/xws.exec.cli -- amend --mode paper --exchange hl --order-id 000001 --price 1.25
+dotnet run --project src/xws.exec.cli -- query orders --mode paper --exchange hl --status open
+dotnet run --project src/xws.exec.cli -- query positions --mode paper --exchange hl
+dotnet run --project src/xws.exec.cli -- cancel --mode paper --exchange hl --order-id 000001
+dotnet run --project src/xws.exec.cli -- cancel-all --mode paper --exchange hl
+```
+
+Note: `xws.exec.cli` persists paper state to `artifacts/paper/state.json` so sequential commands can share state. Delete the file to reset the paper session.
+
+## Quick Start: Paper Demo
+
+Run the scripted demo:
+
+```
+./scripts/demo-paper.sh
+```
+
+PowerShell (Windows):
+
+```
+.\scripts\demo-paper.ps1
+```
+
+Manual demo flow (Hyperliquid):
+
+```
+dotnet run --project src/xws -- subscribe trades --sub hl=SOL --max-messages 5 --timeout-seconds 20
+dotnet run --project src/xws.exec.cli -- place --mode paper --exchange hl --symbol SOL --side buy --type limit --size 1 --price 100 --client-order-id demo-hl-001
+dotnet run --project src/xws.exec.cli -- query orders --mode paper --exchange hl --status open
+dotnet run --project src/xws.exec.cli -- amend --mode paper --exchange hl --order-id 000001 --price 101
+dotnet run --project src/xws.exec.cli -- cancel --mode paper --exchange hl --order-id 000001
+```
+
+OKX paper order example (symbol format: `BTC-USDT-SWAP`):
+
+```
+dotnet run --project src/xws.exec.cli -- place --mode paper --exchange okx --symbol BTC-USDT-SWAP --side buy --type limit --size 0.01 --price 50000 --client-order-id demo-okx-001
+```
+
+Bybit paper order example (symbol format: `BTCUSDT`):
+
+```
+dotnet run --project src/xws.exec.cli -- place --mode paper --exchange bybit --symbol BTCUSDT --side buy --type limit --size 0.01 --price 50000 --client-order-id demo-bybit-001
+```
+
+Expected output (JSONL):
+
+```
+{"status":1,"orderId":"000001","clientOrderId":"demo-hl-001","mode":0}
 ```
 
 ## Commands
@@ -144,6 +191,62 @@ dotnet run --project src/xws -- subscribe l2 `
   --max-messages 5 --timeout-seconds 15
 ```
 
+### mux subscribe funding / liquidations / markprice / fills
+
+Examples:
+
+```
+dotnet run --project src/xws -- subscribe funding \
+  --sub hl=SOL \
+  --sub mexc.fut=BTC_USDT \
+  --sub okx.fut=BTC-USDT-SWAP \
+  --max-messages 5 --timeout-seconds 20
+
+# HL liquidations requires XWS_HL_USER
+dotnet run --project src/xws -- subscribe liquidations \
+  --sub hl=SOL \
+  --sub okx.fut=BTC-USDT-SWAP \
+  --max-messages 5 --timeout-seconds 20
+
+dotnet run --project src/xws -- subscribe markprice \
+  --sub hl=SOL \
+  --sub mexc.fut=BTC_USDT \
+  --sub bybit.fut=BTCUSDT \
+  --max-messages 5 --timeout-seconds 20
+
+# HL fills requires XWS_HL_USER
+dotnet run --project src/xws -- subscribe fills \
+  --sub hl=SOL \
+  --max-messages 5 --timeout-seconds 20
+```
+
+PowerShell (Windows):
+
+```
+dotnet run --project src/xws -- subscribe funding `
+  --sub hl=SOL `
+  --sub mexc.fut=BTC_USDT `
+  --sub okx.fut=BTC-USDT-SWAP `
+  --max-messages 5 --timeout-seconds 20
+
+# HL liquidations requires XWS_HL_USER
+dotnet run --project src/xws -- subscribe liquidations `
+  --sub hl=SOL `
+  --sub okx.fut=BTC-USDT-SWAP `
+  --max-messages 5 --timeout-seconds 20
+
+dotnet run --project src/xws -- subscribe markprice `
+  --sub hl=SOL `
+  --sub mexc.fut=BTC_USDT `
+  --sub bybit.fut=BTCUSDT `
+  --max-messages 5 --timeout-seconds 20
+
+# HL fills requires XWS_HL_USER
+dotnet run --project src/xws -- subscribe fills `
+  --sub hl=SOL `
+  --max-messages 5 --timeout-seconds 20
+```
+
 ## IO Contract
 
 - stdout: WebSocket messages only, one JSON object per line (JSONL)
@@ -185,11 +288,14 @@ dotnet run --project src/xws -- dev emit --count 5 --timeout-seconds 5
 ## Env Vars
 
 - XWS_HL_NETWORK (optional, default: mainnet; values: mainnet|testnet)
-- XWS_HL_USER (required for private positions subscription)
+- XWS_HL_USER (required for private positions and fills subscriptions)
 - XWS_HL_WS_URL (optional override)
 - XWS_HL_HTTP_URL (optional override)
 - XWS_MEXC_SPOT_WS_URL (optional override)
-- XWS_MEXC_FUT_WS_URL (optional override; scaffold only)
+- XWS_MEXC_FUT_WS_URL (optional override for futures WS)
+- XWS_OKX_WS_URL (optional override for OKX public WS)
+- XWS_BYBIT_SPOT_WS_URL (optional override for Bybit spot WS)
+- XWS_BYBIT_FUT_WS_URL (optional override for Bybit futures WS)
 - XWS_EXEC_ARM (required for mainnet execution; must be exactly `1`)
 
 Execution credentials:
@@ -210,7 +316,7 @@ and at least one envelope line was emitted.
 - Exit codes: `0` success, `1` user/input/config error, `2` system/runtime error (unexpected failure).
 - Common CLI errors:
   - `--timeout-seconds requires --max-messages`: set both to enforce deterministic stop.
-  - `missing required env var: XWS_HL_USER`: required for `hl subscribe positions`.
+  - `missing required env var: XWS_HL_USER`: required for `hl subscribe positions`, `subscribe liquidations`, and `subscribe fills`.
   - `mux only supports --format envelope`: mux does not support raw output.
   - `mux completed without output` or `mux timeout reached`: no envelopes were emitted; exit code will be `1`.
 

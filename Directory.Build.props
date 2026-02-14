@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
-    <Version>0.7.0</Version>
-    <PackageVersion>0.7.0</PackageVersion>
+    <Version>0.8.0</Version>
+    <PackageVersion>0.8.0</PackageVersion>
     <Authors>exchange-connector</Authors>
     <Company>exchange-connector</Company>
     <RepositoryUrl>https://github.com/Picasso2453/exchange-connector</RepositoryUrl>

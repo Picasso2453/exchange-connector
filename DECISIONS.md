@@ -47,3 +47,16 @@
 - Mainnet arming rule: requires `--arm-live` and `XWS_EXEC_ARM=1` (fail-closed).
 - Idempotency rule: `clientOrderId` required for mainnet.
 - Windows-safe CLI name: `xws.exec.cli` to avoid case-insensitive collisions.
+
+## Milestone 8 (2026-02-14)
+
+- OKX WS public endpoint defaulted to `wss://ws.okx.com:8443/ws/v5/public` with override via `XWS_OKX_WS_URL`.
+- OKX WS channel assumptions for receiver: `trades` for trades and `books5` for L2 (logged due to partial doc access).
+- OKX WS channel assumptions for expanded data: `funding-rate`, `liquidation-orders`, `mark-price` (logged due to partial doc access).
+- Paper mode fill price: market orders use deterministic default price `100` when no price is provided (logged for demo consistency).
+- Bybit WS endpoints assumed: `wss://stream.bybit.com/v5/public/spot` and `wss://stream.bybit.com/v5/public/linear`, override via `XWS_BYBIT_SPOT_WS_URL` / `XWS_BYBIT_FUT_WS_URL`.
+- Bybit WS channel assumptions: `publicTrade.<symbol>` for trades and `orderbook.50.<symbol>` for L2 (logged due to partial doc access).
+- Bybit WS channel assumptions for expanded data: `fundingRate.<symbol>`, `liquidation.<symbol>`, `markPrice.<symbol>` (logged due to partial doc access).
+- Hyperliquid WS channel assumptions for expanded data: `activeAssetCtx` for funding/mark price, `userEvents` for liquidations, `userFills` for fills (logged due to partial doc access).
+- MEXC futures WS channel assumptions for expanded data: `sub.fundingRate`/`push.fundingRate` and `sub.markPrice`/`push.markPrice` (logged due to partial doc access).
+- Paper execution CLI persists state to `artifacts/paper/state.json` to enable multi-command lifecycle demos (library default remains in-memory).

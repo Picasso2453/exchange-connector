@@ -1,0 +1,1 @@
+{"type":"xws.envelope.v1","exchange":"okx","market":"fut","stream":"markprice","symbols":["BTC-USDT-SWAP"],"receivedAt":"2026-02-14T00:00:00.0000000Z","raw":{"arg":{"channel":"mark-price","instId":"BTC-USDT-SWAP"},"data":[{"instId":"BTC-USDT-SWAP","markPx":"50005","ts":"1700000000000"}]},"rawEncoding":"json"}

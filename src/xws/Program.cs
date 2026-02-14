@@ -173,6 +173,10 @@ mexcTradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeou
 var muxCommand = new Command("subscribe", "Subscribe to multiple exchanges");
 var muxTradesCommand = new Command("trades", "Mux trades subscriptions");
 var muxL2Command = new Command("l2", "Mux l2 orderbook subscriptions");
+var muxFundingCommand = new Command("funding", "Mux funding rate subscriptions");
+var muxLiquidationsCommand = new Command("liquidations", "Mux liquidations subscriptions");
+var muxMarkPriceCommand = new Command("markprice", "Mux mark price subscriptions");
+var muxFillsCommand = new Command("fills", "Mux user fills subscriptions");
 var muxSubOption = new Option<string[]>(
     "--sub",
     "Subscription spec: <exchange>[.<market>]=SYM1,SYM2 (repeatable)")
@@ -379,8 +383,408 @@ muxL2Command.SetHandler(async (string[] subs, int? maxMessages, int? timeoutSeco
     }
 }, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
 
+muxFundingCommand.AddOption(muxSubOption);
+muxFundingCommand.AddOption(muxMaxMessagesOption);
+muxFundingCommand.AddOption(muxTimeoutSecondsOption);
+muxFundingCommand.AddOption(muxFormatOption);
+muxFundingCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeoutSeconds, string format) =>
+{
+    try
+    {
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
+        };
+
+        if (!IsValidFormat(format))
+        {
+            Logger.Error("--format must be envelope or raw");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.Error("mux only supports --format envelope");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var parsed = new List<ParsedSub>();
+        foreach (var sub in subs)
+        {
+            if (!TryParseSub(sub, out var parsedSub))
+            {
+                Logger.Error($"invalid --sub format: {sub}");
+                Environment.ExitCode = 1;
+                return;
+            }
+
+            parsed.Add(parsedSub);
+        }
+
+        var options = new MuxRunnerOptions
+        {
+            MaxMessages = maxMessages,
+            Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+        };
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
+            var exitCode = await runner.RunMuxFundingAsync(muxSubs, options, cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"mux subscribe funding failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"mux subscribe funding failed: {ex.Message}");
+        Environment.ExitCode = 2;
+    }
+}, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
+
+muxLiquidationsCommand.AddOption(muxSubOption);
+muxLiquidationsCommand.AddOption(muxMaxMessagesOption);
+muxLiquidationsCommand.AddOption(muxTimeoutSecondsOption);
+muxLiquidationsCommand.AddOption(muxFormatOption);
+muxLiquidationsCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeoutSeconds, string format) =>
+{
+    try
+    {
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
+        };
+
+        if (!IsValidFormat(format))
+        {
+            Logger.Error("--format must be envelope or raw");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.Error("mux only supports --format envelope");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var parsed = new List<ParsedSub>();
+        foreach (var sub in subs)
+        {
+            if (!TryParseSub(sub, out var parsedSub))
+            {
+                Logger.Error($"invalid --sub format: {sub}");
+                Environment.ExitCode = 1;
+                return;
+            }
+
+            parsed.Add(parsedSub);
+        }
+
+        var options = new MuxRunnerOptions
+        {
+            MaxMessages = maxMessages,
+            Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+        };
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
+            var exitCode = await runner.RunMuxLiquidationsAsync(muxSubs, options, cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"mux subscribe liquidations failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"mux subscribe liquidations failed: {ex.Message}");
+        Environment.ExitCode = 2;
+    }
+}, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
+
+muxMarkPriceCommand.AddOption(muxSubOption);
+muxMarkPriceCommand.AddOption(muxMaxMessagesOption);
+muxMarkPriceCommand.AddOption(muxTimeoutSecondsOption);
+muxMarkPriceCommand.AddOption(muxFormatOption);
+muxMarkPriceCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeoutSeconds, string format) =>
+{
+    try
+    {
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
+        };
+
+        if (!IsValidFormat(format))
+        {
+            Logger.Error("--format must be envelope or raw");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.Error("mux only supports --format envelope");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var parsed = new List<ParsedSub>();
+        foreach (var sub in subs)
+        {
+            if (!TryParseSub(sub, out var parsedSub))
+            {
+                Logger.Error($"invalid --sub format: {sub}");
+                Environment.ExitCode = 1;
+                return;
+            }
+
+            parsed.Add(parsedSub);
+        }
+
+        var options = new MuxRunnerOptions
+        {
+            MaxMessages = maxMessages,
+            Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+        };
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
+            var exitCode = await runner.RunMuxMarkPriceAsync(muxSubs, options, cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"mux subscribe markprice failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"mux subscribe markprice failed: {ex.Message}");
+        Environment.ExitCode = 2;
+    }
+}, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
+
+muxFillsCommand.AddOption(muxSubOption);
+muxFillsCommand.AddOption(muxMaxMessagesOption);
+muxFillsCommand.AddOption(muxTimeoutSecondsOption);
+muxFillsCommand.AddOption(muxFormatOption);
+muxFillsCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeoutSeconds, string format) =>
+{
+    try
+    {
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
+        };
+
+        if (!IsValidFormat(format))
+        {
+            Logger.Error("--format must be envelope or raw");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.Error("mux only supports --format envelope");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var parsed = new List<ParsedSub>();
+        foreach (var sub in subs)
+        {
+            if (!TryParseSub(sub, out var parsedSub))
+            {
+                Logger.Error($"invalid --sub format: {sub}");
+                Environment.ExitCode = 1;
+                return;
+            }
+
+            parsed.Add(parsedSub);
+        }
+
+        var options = new MuxRunnerOptions
+        {
+            MaxMessages = maxMessages,
+            Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+        };
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
+            var exitCode = await runner.RunMuxFillsAsync(muxSubs, options, cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"mux subscribe fills failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
+    }
+    catch (Exception ex)
+    {
+        Logger.Error($"mux subscribe fills failed: {ex.Message}");
+        Environment.ExitCode = 2;
+    }
+}, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
+
 muxCommand.AddCommand(muxTradesCommand);
 muxCommand.AddCommand(muxL2Command);
+muxCommand.AddCommand(muxFundingCommand);
+muxCommand.AddCommand(muxLiquidationsCommand);
+muxCommand.AddCommand(muxMarkPriceCommand);
+muxCommand.AddCommand(muxFillsCommand);
 
 var hlSymbolsCommand = new Command("symbols", "List available symbols/instruments");
 var symbolsFilterOption = new Option<string?>("--filter", "Filter by substring");

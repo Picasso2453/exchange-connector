@@ -39,4 +39,68 @@ public static class HyperliquidWs
         var key = new SubscriptionKey("clearinghouseState", $"user={user}");
         return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
     }
+
+    public static SubscriptionRequest BuildFundingSubscription(string symbol)
+    {
+        var payload = new
+        {
+            method = "subscribe",
+            subscription = new
+            {
+                type = "activeAssetCtx",
+                coin = symbol
+            }
+        };
+
+        var key = new SubscriptionKey("activeAssetCtx", $"coin={symbol}");
+        return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
+    }
+
+    public static SubscriptionRequest BuildLiquidationsSubscription(string user)
+    {
+        var payload = new
+        {
+            method = "subscribe",
+            subscription = new
+            {
+                type = "userEvents",
+                user
+            }
+        };
+
+        var key = new SubscriptionKey("userEvents", $"user={user}");
+        return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
+    }
+
+    public static SubscriptionRequest BuildMarkPriceSubscription(string symbol)
+    {
+        var payload = new
+        {
+            method = "subscribe",
+            subscription = new
+            {
+                type = "activeAssetCtx",
+                coin = symbol
+            }
+        };
+
+        var key = new SubscriptionKey("activeAssetCtx", $"coin={symbol}");
+        return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
+    }
+
+    public static SubscriptionRequest BuildUserFillsSubscription(string user)
+    {
+        var payload = new
+        {
+            method = "subscribe",
+            subscription = new
+            {
+                type = "userFills",
+                user
+            }
+        };
+
+        var key = new SubscriptionKey("userFills", $"user={user}");
+        return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
+    }
 }

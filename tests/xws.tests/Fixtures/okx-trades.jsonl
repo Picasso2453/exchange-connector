@@ -1,0 +1,1 @@
+{"type":"xws.envelope.v1","exchange":"okx","market":"fut","stream":"trades","symbols":["BTC-USDT-SWAP"],"receivedAt":"2026-02-14T00:00:00.0000000Z","raw":{"arg":{"channel":"trades","instId":"BTC-USDT-SWAP"},"data":[{"instId":"BTC-USDT-SWAP","tradeId":"1","px":"50000","sz":"0.01","side":"buy","ts":"1700000000000"}]},"rawEncoding":"json"}

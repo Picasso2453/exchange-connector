@@ -68,4 +68,42 @@ public sealed class PaperExecutionClientTests
         Assert.True(result.Success);
         Assert.Equal(2, result.CancelledCount);
     }
+
+    [Fact]
+    public async Task Amend_OpenOrder_UpdatesPrice()
+    {
+        var client = new PaperExecutionClient();
+
+        var placed = await client.PlaceAsync(new PlaceOrderRequest(
+            "HYPE",
+            OrderSide.Buy,
+            OrderType.Limit,
+            1m,
+            Price: 10m), CancellationToken.None);
+
+        var amended = await client.AmendAsync(new AmendOrderRequest(
+            placed.OrderId,
+            null,
+            Price: 11m), CancellationToken.None);
+
+        Assert.Equal(OrderStatus.Open, amended.Status);
+
+        var orders = await client.QueryOrdersAsync(new QueryOrdersRequest(OrderQueryStatus.Open), CancellationToken.None);
+        Assert.Contains(orders.Orders, o => o.OrderId == placed.OrderId && o.Price == 11m);
+    }
+
+    [Fact]
+    public async Task QueryPositions_ReturnsFilledPosition()
+    {
+        var client = new PaperExecutionClient();
+
+        await client.PlaceAsync(new PlaceOrderRequest(
+            "HYPE",
+            OrderSide.Buy,
+            OrderType.Market,
+            2m), CancellationToken.None);
+
+        var positions = await client.QueryPositionsAsync(CancellationToken.None);
+        Assert.Contains(positions.Positions, p => p.Symbol == "HYPE" && p.Size == 2m);
+    }
 }

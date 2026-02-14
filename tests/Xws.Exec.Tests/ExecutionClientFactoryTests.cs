@@ -31,6 +31,18 @@ public sealed class ExecutionClientFactoryTests
         Assert.IsType<HyperliquidExecutionClient>(client);
     }
 
+    [Theory]
+    [InlineData("okx", typeof(OkxExecutionClient))]
+    [InlineData("bybit", typeof(BybitExecutionClient))]
+    [InlineData("mexc", typeof(MexcExecutionClient))]
+    public void Create_Exchange_ReturnsSpecificClient(string exchange, Type expectedType)
+    {
+        var config = new ExecutionConfig(ExecutionMode.Paper, false, null);
+        var client = ExecutionClientFactory.Create(config, exchange);
+
+        Assert.IsType(expectedType, client);
+    }
+
     private sealed class FakeRest : IHyperliquidRest
     {
         public Task<HyperliquidPlaceResult> PlaceOrderAsync(PlaceOrderRequest request, ExecutionConfig config, CancellationToken cancellationToken)
