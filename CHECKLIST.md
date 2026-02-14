@@ -112,4 +112,4 @@
 - [x] Slice 52: PROMPTS.md updated for M8 slices
 - [x] Slice 53: DECISIONS.md updated with M8 architecture decisions
 - [x] Slice 54: MILESTONES.md updated with M8 completion and burst evaluations
-- [ ] Slice 55: Release prep (CHECKLIST, clean root, version bump, tag v0.8.0)
+- [x] Slice 55: Release prep (CHECKLIST, clean root, version bump, tag v0.8.0)
