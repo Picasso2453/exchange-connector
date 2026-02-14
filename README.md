@@ -106,6 +106,22 @@ dotnet run --project src/xws -- subscribe trades \
   --max-messages 10 --timeout-seconds 15
 ```
 
+Note: MEXC connectivity varies by region. If no envelopes are emitted, the command exits `1` (see Troubleshooting).
+
+PowerShell (Windows):
+
+```
+dotnet run --project src/xws -- subscribe trades `
+  --sub hl=SOL `
+  --sub mexc.spot=BTCUSDT,ETHUSDT `
+  --max-messages 50 --timeout-seconds 30
+
+# MEXC futures trades (market key: mexc.fut, symbol format: BTC_USDT)
+dotnet run --project src/xws -- subscribe trades `
+  --sub mexc.fut=BTC_USDT `
+  --max-messages 10 --timeout-seconds 15
+```
+
 ### mux subscribe l2 (envelope default)
 
 Run L2 orderbook streams via mux and emit envelope JSONL.
@@ -116,6 +132,15 @@ Examples:
 # MEXC futures L2 (market key: mexc.fut, symbol format: BTC_USDT)
 dotnet run --project src/xws -- subscribe l2 \
   --sub mexc.fut=BTC_USDT \
+  --max-messages 5 --timeout-seconds 15
+```
+
+PowerShell (Windows):
+
+```
+# MEXC futures L2 (market key: mexc.fut, symbol format: BTC_USDT)
+dotnet run --project src/xws -- subscribe l2 `
+  --sub mexc.fut=BTC_USDT `
   --max-messages 5 --timeout-seconds 15
 ```
 
@@ -177,6 +202,17 @@ Execution credentials:
 In some regions, MEXC WebSocket access may be blocked. If MEXC cannot connect,
 the mux continues with other sources and exits 0 once a stop condition is met
 and at least one envelope line was emitted.
+
+## Troubleshooting
+
+- MEXC region blocking: Some regions block MEXC WS. Expect connection failures; use `dev emit` for offline validation or run mux with at least one non-MEXC source.
+- Dotenv load errors: `--dotenv <path>` requires the file to exist. Use `--no-dotenv` to disable loading or ensure the file is present. Default `.env` is optional.
+- Exit codes: `0` success, `1` user/input/config error, `2` system/runtime error (unexpected failure).
+- Common CLI errors:
+  - `--timeout-seconds requires --max-messages`: set both to enforce deterministic stop.
+  - `missing required env var: XWS_HL_USER`: required for `hl subscribe positions`.
+  - `mux only supports --format envelope`: mux does not support raw output.
+  - `mux completed without output` or `mux timeout reached`: no envelopes were emitted; exit code will be `1`.
 
 ## Configuration
 

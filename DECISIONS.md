@@ -1,6 +1,11 @@
-# Decisions
+﻿# Decisions
 
 ## Pending
+
+## Milestone 7 (2026-02-14)
+
+- Assumption: PM v2.2 protocol document is not present in repo; applied baseline governance rules in AGENTS.md.
+- Assumption: PROMPTS.md slice definitions for M1/M4/M5/M6 inferred from CHECKLIST.md and DECISIONS.md because original slice history was unavailable.
 
 ## Milestone 1 (2026-01-29)
 

@@ -26,9 +26,11 @@ placeCommand.AddOption(clientOrderIdOption);
 
 placeCommand.SetHandler(async (string mode, bool armLive, string symbol, string side, string type, decimal size, decimal? price, string? clientOrderId) =>
 {
+    try
+    {
     if (!TryParseMode(mode, out var execMode))
     {
-        Console.Error.WriteLine("invalid --mode");
+        Console.Error.WriteLine("invalid --mode (expected: paper|testnet|mainnet)");
         Environment.ExitCode = 1;
         return;
     }
@@ -44,14 +46,14 @@ placeCommand.SetHandler(async (string mode, bool armLive, string symbol, string 
 
     if (!TryParseSide(side, out var orderSide))
     {
-        Console.Error.WriteLine("invalid --side");
+        Console.Error.WriteLine("invalid --side (expected: buy|sell)");
         Environment.ExitCode = 1;
         return;
     }
 
     if (!TryParseType(type, out var orderType))
     {
-        Console.Error.WriteLine("invalid --type");
+        Console.Error.WriteLine("invalid --type (expected: market|limit)");
         Environment.ExitCode = 1;
         return;
     }
@@ -65,7 +67,7 @@ placeCommand.SetHandler(async (string mode, bool armLive, string symbol, string 
 
     if (execMode != ExecutionMode.Paper)
     {
-        Console.Error.WriteLine("mode not implemented yet");
+        Console.Error.WriteLine("only paper mode is implemented in the CLI");
         Environment.ExitCode = 1;
         return;
     }
@@ -90,6 +92,12 @@ placeCommand.SetHandler(async (string mode, bool armLive, string symbol, string 
     var result = await client.PlaceAsync(request, CancellationToken.None);
 
     WriteJson(result);
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"place failed: {ex.Message}");
+        Environment.ExitCode = 2;
+    }
 }, modeOption, armLiveOption, symbolOption, sideOption, typeOption, sizeOption, priceOption, clientOrderIdOption);
 
 var cancelCommand = new Command("cancel", "Cancel an order by orderId");
@@ -101,9 +109,11 @@ cancelCommand.AddOption(orderIdOption);
 
 cancelCommand.SetHandler(async (string mode, bool armLive, string orderId) =>
 {
+    try
+    {
     if (!TryParseMode(mode, out var execMode))
     {
-        Console.Error.WriteLine("invalid --mode");
+        Console.Error.WriteLine("invalid --mode (expected: paper|testnet|mainnet)");
         Environment.ExitCode = 1;
         return;
     }
@@ -119,7 +129,7 @@ cancelCommand.SetHandler(async (string mode, bool armLive, string orderId) =>
 
     if (execMode != ExecutionMode.Paper)
     {
-        Console.Error.WriteLine("mode not implemented yet");
+        Console.Error.WriteLine("only paper mode is implemented in the CLI");
         Environment.ExitCode = 1;
         return;
     }
@@ -128,6 +138,12 @@ cancelCommand.SetHandler(async (string mode, bool armLive, string orderId) =>
     var result = await client.CancelAsync(new CancelOrderRequest(OrderId: orderId), CancellationToken.None);
 
     WriteJson(result);
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"cancel failed: {ex.Message}");
+        Environment.ExitCode = 2;
+    }
 }, modeOption, armLiveOption, orderIdOption);
 
 var cancelAllCommand = new Command("cancel-all", "Cancel all open orders");
@@ -139,9 +155,11 @@ cancelAllCommand.AddOption(symbolFilterOption);
 
 cancelAllCommand.SetHandler(async (string mode, bool armLive, string? symbol) =>
 {
+    try
+    {
     if (!TryParseMode(mode, out var execMode))
     {
-        Console.Error.WriteLine("invalid --mode");
+        Console.Error.WriteLine("invalid --mode (expected: paper|testnet|mainnet)");
         Environment.ExitCode = 1;
         return;
     }
@@ -157,7 +175,7 @@ cancelAllCommand.SetHandler(async (string mode, bool armLive, string? symbol) =>
 
     if (execMode != ExecutionMode.Paper)
     {
-        Console.Error.WriteLine("mode not implemented yet");
+        Console.Error.WriteLine("only paper mode is implemented in the CLI");
         Environment.ExitCode = 1;
         return;
     }
@@ -166,14 +184,28 @@ cancelAllCommand.SetHandler(async (string mode, bool armLive, string? symbol) =>
     var result = await client.CancelAllAsync(new CancelAllRequest(symbol), CancellationToken.None);
 
     WriteJson(result);
+    }
+    catch (Exception ex)
+    {
+        Console.Error.WriteLine($"cancel-all failed: {ex.Message}");
+        Environment.ExitCode = 2;
+    }
 }, modeOption, armLiveOption, symbolFilterOption);
 
 root.AddCommand(placeCommand);
 root.AddCommand(cancelCommand);
 root.AddCommand(cancelAllCommand);
 
-var exitCode = await root.InvokeAsync(args);
-return Environment.ExitCode != 0 ? Environment.ExitCode : exitCode;
+try
+{
+    var exitCode = await root.InvokeAsync(args);
+    return Environment.ExitCode != 0 ? Environment.ExitCode : exitCode;
+}
+catch (Exception ex)
+{
+    Console.Error.WriteLine($"fatal: {ex.Message}");
+    return 2;
+}
 
 static bool TryParseMode(string value, out ExecutionMode mode)
 {

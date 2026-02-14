@@ -97,8 +97,13 @@ public sealed class MuxRunner
             Logger.Error("mux timeout reached");
         }
 
-        if (emitted == 0 && (timedOut || hadProducerFailures))
+        if (emitted == 0)
         {
+            if (!timedOut && !hadProducerFailures)
+            {
+                Logger.Error("mux completed without output");
+            }
+
             return 1;
         }
 

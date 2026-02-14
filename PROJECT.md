@@ -1,65 +1,47 @@
-# xws — Exchange WebSocket CLI (Milestone 1)
+﻿# xws - Exchange WebSocket CLI
 
 ## One-sentence intent
-A **.NET 8 C# CLI** that connects to an exchange WebSocket (starting with **Hyperliquid**) and streams **raw JSON messages** to **stdout as JSONL**, with **robust reconnect** and **env-var gated private streams**.
+A .NET 8 C# CLI that connects to exchange WebSockets (starting with Hyperliquid) and streams raw JSON messages to stdout as JSONL, with robust reconnect and env-var gated private streams.
 
 ---
 
 ## Target user + primary use case
-Engineers/quants who want a **scriptable, pipe-friendly WebSocket pump** to feed other tools (`jq`, Python, log processors) without schema normalization yet.
+Engineers/quants who want a scriptable, pipe-friendly WebSocket pump to feed other tools (jq, Python, log processors) without schema normalization yet.
 
 ---
 
-## What Milestone 1 includes (IN)
+## Project scope (stable contract)
 ### CLI + I/O contract
-- **stdout:** WebSocket messages only, **one JSON object per line (JSONL)**
-- **stderr:** logs, status, errors only
-
-### Hyperliquid commands
-- `xws hl symbols [--filter <text>]`
-  - Lists valid instruments/symbols as **raw JSONL** (discovery; no symbol mapping).
-- `xws hl subscribe trades --symbol <native_symbol> [--max-messages N] [--timeout-seconds T]`
-  - Connects to HL WS, subscribes, streams WS frames as JSONL.
-- `xws hl subscribe positions [--max-messages N] [--timeout-seconds T]`
-  - Private proof: subscribes to user/account positions stream when env vars present.
+- stdout: WebSocket messages only, one JSON object per line (JSONL)
+- stderr: logs, status, errors only
 
 ### Reliability + lifecycle
-- **Reconnect with exponential backoff**
-- **Auto re-subscribe** after reconnect (idempotent subscription registry)
-- **Retry cap:** after **3 failed reconnect attempts**, exits **non-zero** with a clear stderr message
-- **Ctrl+C:** clean shutdown, exits **0**
+- Reconnect with exponential backoff
+- Auto re-subscribe after reconnect (idempotent subscription registry)
+- Retry cap: after 3 failed reconnect attempts, exits non-zero with a clear stderr message
+- Ctrl+C: clean shutdown, exits 0
 
 ### Platform target
-- **Windows primary**
-- Designed to be **Linux-portable** (CI checks Ubuntu build)
-
----
-
-## What Milestone 1 does NOT include (OUT)
-- No normalized schema / cross-exchange translation layer
-- No trading actions (placing/canceling orders), no signing flows
-- No local order state, no portfolio tracking beyond streaming
-- No persistence (DB/files)
-- No TUI/fancy UI
-- No symbol translation (no `BTC/USDT` mapping); **exchange-native symbols only**
+- Windows primary
+- Linux supported (CI validates on Ubuntu)
 
 ---
 
 ## Tech stack
-- **Language/runtime:** C# / .NET 8
-- **CLI parsing:** `System.CommandLine` (minimal deps)
-- **WS client:** `ClientWebSocket` (built-in)
-- **HTTP:** `HttpClient` (for `/info` discovery)
+- Language/runtime: C# / .NET 8
+- CLI parsing: System.CommandLine (minimal deps)
+- WS client: ClientWebSocket (built-in)
+- HTTP: HttpClient (for /info discovery)
 
 ---
 
 ## Environment variables (Hyperliquid)
-Secrets/identity are **env-var only**; nothing is written to disk.
+Secrets/identity are env-var only; nothing is written to disk.
 
-- `XWS_HL_NETWORK` (optional) — `mainnet` | `testnet` (default: `mainnet`)
-- `XWS_HL_USER` (required for private) — user address (used for positions/account subscription)
-- `XWS_HL_WS_URL` (optional) — override WS endpoint
-- `XWS_HL_HTTP_URL` (optional) — override HTTP endpoint
+- XWS_HL_NETWORK (optional) - mainnet | testnet (default: mainnet)
+- XWS_HL_USER (required for private) - user address (positions/account subscription)
+- XWS_HL_WS_URL (optional) - override WS endpoint
+- XWS_HL_HTTP_URL (optional) - override HTTP endpoint
 
 ---
 
@@ -70,24 +52,42 @@ From repo root:
 dotnet restore
 dotnet build -c Release
 dotnet run --project src/xws -- --help
+```
 
 ---
 
-## Milestone 2 (Draft)
-- Add MEXC spot trades adapter (protobuf parsing) with futures scaffolding.
-- Introduce mux command to run HL + MEXC concurrently with envelope JSONL output.
-- Preserve legacy raw output via `--format raw` on existing HL commands.
+## Milestones (M1-M6 complete)
 
-## Milestone 2 (Complete)
-- MEXC spot trades adapter with protobuf decoding and offline test.
-- Mux command runs HL + MEXC concurrently with envelope JSONL default.
-- Best-effort mux behavior documented for partial network access.
+## Milestone 1 - Hyperliquid receiver baseline
+- HL symbols discovery command (raw JSONL)
+- HL subscribe trades + positions (private gated by env vars)
+- Reconnect/backoff with resubscribe and retry cap
+- JSONL stdout contract with logs to stderr
 
-## Milestone 6 (Draft)
-- Add execution module (`Xws.Exec`) for safe place/cancel flows (library-first).
-- Add `xws.exec.cli` as a thin execution wrapper (Windows-safe name).
-- Keep receiver/ingestion behavior unchanged.
-- IN: market + limit place, cancel by orderId, cancel-all.
-- OUT: replace/amend, stop/conditional orders.
-- Modes: paper default, testnet/mainnet available in library.
-- Safety: mainnet requires `--arm-live` + `XWS_EXEC_ARM=1` and `clientOrderId`.
+## Milestone 2 - MEXC spot + mux envelope
+- MEXC spot trades adapter (protobuf decoding) with offline tests
+- Mux command to run HL + MEXC concurrently
+- Envelope JSONL default for mux; legacy HL supports --format raw
+- Best-effort mux behavior for partial connectivity
+
+## Milestone 3 - Core/CLI split + offline CI
+- Xws.Core library split from CLI
+- Single stdout writer in CLI; Core never writes to console
+- Offline CI build/test without live exchange endpoints
+
+## Milestone 4 - MEXC futures + L2 via mux
+- MEXC futures trades supported via mux (market key: mexc.fut)
+- MEXC futures L2 orderbook stream via mux
+- Envelope JSONL assertions and fixture replay harness
+
+## Milestone 5 - dotenv loading and flags
+- CLI loads .env if present (no error if missing)
+- --dotenv <path> requires file to exist (non-zero if missing)
+- --no-dotenv disables dotenv loading
+- Process env vars take precedence; dotenv fills missing values only
+
+## Milestone 6 - Execution module
+- Execution split: Xws.Exec library + xws.exec.cli wrapper
+- Modes: paper default; testnet and mainnet supported in library
+- Mainnet arming rule: requires --arm-live and XWS_EXEC_ARM=1
+- Idempotency guard: clientOrderId required for mainnet

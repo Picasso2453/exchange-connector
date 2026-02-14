@@ -34,36 +34,44 @@ devEmitCommand.AddOption(devCountOption);
 devEmitCommand.AddOption(devTimeoutSecondsOption);
 devEmitCommand.SetHandler(async (int count, int? timeoutSeconds) =>
 {
-    if (count <= 0)
-    {
-        Logger.Error("--count must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    using var cts = timeoutSeconds.HasValue
-        ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds.Value))
-        : new CancellationTokenSource();
-
-    var output = new OutputChannel();
-    var writerTask = WriteOutputAsync(output.Reader, cts.Token);
     try
     {
-        foreach (var line in DevEmitter.BuildLines(count))
+        if (count <= 0)
         {
-            cts.Token.ThrowIfCancellationRequested();
-            output.Writer.TryWrite(line);
+            Logger.Error("--count must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        using var cts = timeoutSeconds.HasValue
+            ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds.Value))
+            : new CancellationTokenSource();
+
+        var output = new OutputChannel();
+        var writerTask = WriteOutputAsync(output.Reader, cts.Token);
+        try
+        {
+            foreach (var line in DevEmitter.BuildLines(count))
+            {
+                cts.Token.ThrowIfCancellationRequested();
+                output.Writer.TryWrite(line);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.Error("dev emit timeout reached");
+            Environment.ExitCode = 1;
+        }
+        finally
+        {
+            output.Complete();
+            await writerTask;
         }
     }
-    catch (OperationCanceledException)
+    catch (Exception ex)
     {
-        Logger.Error("dev emit timeout reached");
-        Environment.ExitCode = 1;
-    }
-    finally
-    {
-        output.Complete();
-        await writerTask;
+        Logger.Error($"dev emit failed: {ex.Message}");
+        Environment.ExitCode = 2;
     }
 }, devCountOption, devTimeoutSecondsOption);
 devCommand.AddCommand(devEmitCommand);
@@ -80,77 +88,85 @@ mexcTradesCommand.AddOption(muxMaxMessagesOption);
 mexcTradesCommand.AddOption(muxTimeoutSecondsOption);
 mexcTradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeoutSeconds) =>
 {
-    using var cts = new CancellationTokenSource();
-    var cancelLogged = 0;
-    Console.CancelKeyPress += (_, e) =>
-    {
-        e.Cancel = true;
-        if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
-        {
-            Logger.Info("shutdown requested");
-        }
-        cts.Cancel();
-    };
-
-    if (maxMessages.HasValue && maxMessages.Value <= 0)
-    {
-        Logger.Error("--max-messages must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
-    {
-        Logger.Error("--timeout-seconds must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (timeoutSeconds.HasValue && !maxMessages.HasValue)
-    {
-        Logger.Error("--timeout-seconds requires --max-messages");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    var symbols = symbol
-        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-        .Select(s => s.ToUpperInvariant())
-        .ToArray();
-
-    if (symbols.Length == 0)
-    {
-        Logger.Error("--symbol requires at least one value");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (symbols.Length > 30)
-    {
-        Logger.Error("mexc spot supports max 30 subscriptions per connection");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    var runner = new XwsRunner();
-    var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
     try
     {
-        var exitCode = await runner.RunMexcSpotTradesAsync(
-            symbols,
-            maxMessages,
-            timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null,
-            cts.Token);
-        Environment.ExitCode = exitCode;
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
+        {
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
+        };
+
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var symbols = symbol
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => s.ToUpperInvariant())
+            .ToArray();
+
+        if (symbols.Length == 0)
+        {
+            Logger.Error("--symbol requires at least one value");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (symbols.Length > 30)
+        {
+            Logger.Error("mexc spot supports max 30 subscriptions per connection");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var exitCode = await runner.RunMexcSpotTradesAsync(
+                symbols,
+                maxMessages,
+                timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null,
+                cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"mexc spot subscribe trades failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
     }
     catch (Exception ex)
     {
         Logger.Error($"mexc spot subscribe trades failed: {ex.Message}");
-        Environment.ExitCode = 1;
-    }
-    finally
-    {
-        await writerTask;
+        Environment.ExitCode = 2;
     }
 }, mexcSymbolOption, muxMaxMessagesOption, muxTimeoutSecondsOption);
 
@@ -171,88 +187,96 @@ muxTradesCommand.AddOption(muxTimeoutSecondsOption);
 muxTradesCommand.AddOption(muxFormatOption);
 muxTradesCommand.SetHandler(async (string[] subs, int? maxMessages, int? timeoutSeconds, string format) =>
 {
-    using var cts = new CancellationTokenSource();
-    var cancelLogged = 0;
-    Console.CancelKeyPress += (_, e) =>
+    try
     {
-        e.Cancel = true;
-        if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
         {
-            Logger.Info("shutdown requested");
-        }
-        cts.Cancel();
-    };
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
+        };
 
-    if (!IsValidFormat(format))
-    {
-        Logger.Error("--format must be envelope or raw");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
-    {
-        Logger.Error("mux only supports --format envelope");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (maxMessages.HasValue && maxMessages.Value <= 0)
-    {
-        Logger.Error("--max-messages must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
-    {
-        Logger.Error("--timeout-seconds must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (timeoutSeconds.HasValue && !maxMessages.HasValue)
-    {
-        Logger.Error("--timeout-seconds requires --max-messages");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    var parsed = new List<ParsedSub>();
-    foreach (var sub in subs)
-    {
-        if (!TryParseSub(sub, out var parsedSub))
+        if (!IsValidFormat(format))
         {
-            Logger.Error($"invalid --sub format: {sub}");
+            Logger.Error("--format must be envelope or raw");
             Environment.ExitCode = 1;
             return;
         }
 
-        parsed.Add(parsedSub);
-    }
+        if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.Error("mux only supports --format envelope");
+            Environment.ExitCode = 1;
+            return;
+        }
 
-    var options = new MuxRunnerOptions
-    {
-        MaxMessages = maxMessages,
-        Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
-    };
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
 
-    var runner = new XwsRunner();
-    var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
-    try
-    {
-        var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
-        var exitCode = await runner.RunMuxTradesAsync(muxSubs, options, cts.Token);
-        Environment.ExitCode = exitCode;
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var parsed = new List<ParsedSub>();
+        foreach (var sub in subs)
+        {
+            if (!TryParseSub(sub, out var parsedSub))
+            {
+                Logger.Error($"invalid --sub format: {sub}");
+                Environment.ExitCode = 1;
+                return;
+            }
+
+            parsed.Add(parsedSub);
+        }
+
+        var options = new MuxRunnerOptions
+        {
+            MaxMessages = maxMessages,
+            Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+        };
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
+            var exitCode = await runner.RunMuxTradesAsync(muxSubs, options, cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"mux subscribe trades failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
     }
     catch (Exception ex)
     {
         Logger.Error($"mux subscribe trades failed: {ex.Message}");
-        Environment.ExitCode = 1;
-    }
-    finally
-    {
-        await writerTask;
+        Environment.ExitCode = 2;
     }
 }, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
 
@@ -262,88 +286,96 @@ muxL2Command.AddOption(muxTimeoutSecondsOption);
 muxL2Command.AddOption(muxFormatOption);
 muxL2Command.SetHandler(async (string[] subs, int? maxMessages, int? timeoutSeconds, string format) =>
 {
-    using var cts = new CancellationTokenSource();
-    var cancelLogged = 0;
-    Console.CancelKeyPress += (_, e) =>
+    try
     {
-        e.Cancel = true;
-        if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
         {
-            Logger.Info("shutdown requested");
-        }
-        cts.Cancel();
-    };
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
+        };
 
-    if (!IsValidFormat(format))
-    {
-        Logger.Error("--format must be envelope or raw");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
-    {
-        Logger.Error("mux only supports --format envelope");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (maxMessages.HasValue && maxMessages.Value <= 0)
-    {
-        Logger.Error("--max-messages must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
-    {
-        Logger.Error("--timeout-seconds must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (timeoutSeconds.HasValue && !maxMessages.HasValue)
-    {
-        Logger.Error("--timeout-seconds requires --max-messages");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    var parsed = new List<ParsedSub>();
-    foreach (var sub in subs)
-    {
-        if (!TryParseSub(sub, out var parsedSub))
+        if (!IsValidFormat(format))
         {
-            Logger.Error($"invalid --sub format: {sub}");
+            Logger.Error("--format must be envelope or raw");
             Environment.ExitCode = 1;
             return;
         }
 
-        parsed.Add(parsedSub);
-    }
+        if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
+        {
+            Logger.Error("mux only supports --format envelope");
+            Environment.ExitCode = 1;
+            return;
+        }
 
-    var options = new MuxRunnerOptions
-    {
-        MaxMessages = maxMessages,
-        Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
-    };
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
 
-    var runner = new XwsRunner();
-    var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
-    try
-    {
-        var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
-        var exitCode = await runner.RunMuxL2Async(muxSubs, options, cts.Token);
-        Environment.ExitCode = exitCode;
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var parsed = new List<ParsedSub>();
+        foreach (var sub in subs)
+        {
+            if (!TryParseSub(sub, out var parsedSub))
+            {
+                Logger.Error($"invalid --sub format: {sub}");
+                Environment.ExitCode = 1;
+                return;
+            }
+
+            parsed.Add(parsedSub);
+        }
+
+        var options = new MuxRunnerOptions
+        {
+            MaxMessages = maxMessages,
+            Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+        };
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var muxSubs = parsed.Select(p => new MuxSubscription(p.Exchange, p.Market, p.Symbols)).ToList();
+            var exitCode = await runner.RunMuxL2Async(muxSubs, options, cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"mux subscribe l2 failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
     }
     catch (Exception ex)
     {
         Logger.Error($"mux subscribe l2 failed: {ex.Message}");
-        Environment.ExitCode = 1;
-    }
-    finally
-    {
-        await writerTask;
+        Environment.ExitCode = 2;
     }
 }, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);
 
@@ -355,36 +387,63 @@ var symbolsFilterOption = new Option<string?>("--filter", "Filter by substring")
 hlSymbolsCommand.AddOption(symbolsFilterOption);
 hlSymbolsCommand.SetHandler(async (string? filter) =>
 {
-    var output = new OutputChannel();
-    var writerTask = WriteOutputAsync(output.Reader, CancellationToken.None);
-    var writer = new JsonlWriter(line => output.Writer.TryWrite(line));
-
+    var ok = true;
     try
     {
-        var config = HyperliquidConfig.Load();
-        Logger.Info($"symbols: posting to {config.HttpUri}");
-
-        var meta = await HyperliquidHttp.PostInfoAsync(config.HttpUri, "meta", CancellationToken.None);
-        if (ShouldEmit(meta, filter))
+        try
         {
-            writer.WriteLine(meta);
+            var config = HyperliquidConfig.Load();
+            Logger.Info($"symbols: posting to {config.HttpUri}");
+
+            var meta = await HyperliquidHttp.PostInfoAsync(config.HttpUri, "meta", CancellationToken.None);
+            if (Console.IsOutputRedirected && string.IsNullOrWhiteSpace(filter))
+            {
+                if (ShouldEmit(meta, filter))
+                {
+                    Console.Out.WriteLine(meta);
+                }
+
+                Environment.Exit(0);
+            }
+
+            var output = new OutputChannel();
+            var writerTask = WriteOutputAsync(output.Reader, CancellationToken.None);
+            var writer = new JsonlWriter(line => output.Writer.TryWrite(line));
+            try
+            {
+                if (ShouldEmit(meta, filter))
+                {
+                    writer.WriteLine(meta);
+                }
+
+                var spotMeta = await HyperliquidHttp.PostInfoAsync(config.HttpUri, "spotMeta", CancellationToken.None);
+                if (ShouldEmit(spotMeta, filter))
+                {
+                    writer.WriteLine(spotMeta);
+                }
+            }
+            finally
+            {
+                output.Complete();
+                await writerTask;
+            }
         }
-
-        var spotMeta = await HyperliquidHttp.PostInfoAsync(config.HttpUri, "spotMeta", CancellationToken.None);
-        if (ShouldEmit(spotMeta, filter))
+        catch (Exception ex)
         {
-            writer.WriteLine(spotMeta);
+            Logger.Error($"hl symbols failed: {ex.Message}");
+            Environment.ExitCode = 2;
+            ok = false;
         }
     }
     catch (Exception ex)
     {
         Logger.Error($"hl symbols failed: {ex.Message}");
-        Environment.ExitCode = 1;
+        Environment.ExitCode = 2;
     }
-    finally
+
+    if (ok && Environment.ExitCode == 0)
     {
-        output.Complete();
-        await writerTask;
+        Environment.ExitCode = 0;
     }
 }, symbolsFilterOption);
 
@@ -404,67 +463,75 @@ tradesCommand.AddOption(timeoutSecondsOption);
 tradesCommand.AddOption(formatOption);
 tradesCommand.SetHandler(async (string symbol, int? maxMessages, int? timeoutSeconds, string format) =>
 {
-    using var cts = new CancellationTokenSource();
-    var cancelLogged = 0;
-    Console.CancelKeyPress += (_, e) =>
-    {
-        e.Cancel = true;
-        if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
-        {
-            Logger.Info("shutdown requested");
-        }
-        cts.Cancel();
-    };
-
-    if (maxMessages.HasValue && maxMessages.Value <= 0)
-    {
-        Logger.Error("--max-messages must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
-    {
-        Logger.Error("--timeout-seconds must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (timeoutSeconds.HasValue && !maxMessages.HasValue)
-    {
-        Logger.Error("--timeout-seconds requires --max-messages");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (!IsValidFormat(format))
-    {
-        Logger.Error("--format must be envelope or raw");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    var runner = new XwsRunner();
-    var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
     try
     {
-        var options = new WebSocketRunnerOptions
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
         {
-            MaxMessages = maxMessages,
-            Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
         };
 
-        var exitCode = await runner.RunHlTradesAsync(symbol, options, format, cts.Token);
-        Environment.ExitCode = exitCode;
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (!IsValidFormat(format))
+        {
+            Logger.Error("--format must be envelope or raw");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var options = new WebSocketRunnerOptions
+            {
+                MaxMessages = maxMessages,
+                Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+            };
+
+            var exitCode = await runner.RunHlTradesAsync(symbol, options, format, cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"hl subscribe trades failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
     }
     catch (Exception ex)
     {
         Logger.Error($"hl subscribe trades failed: {ex.Message}");
-        Environment.ExitCode = 1;
-    }
-    finally
-    {
-        await writerTask;
+        Environment.ExitCode = 2;
     }
 }, tradesSymbolOption, maxMessagesOption, timeoutSecondsOption, formatOption);
 
@@ -474,75 +541,83 @@ positionsCommand.AddOption(timeoutSecondsOption);
 positionsCommand.AddOption(formatOption);
 positionsCommand.SetHandler(async (int? maxMessages, int? timeoutSeconds, string format) =>
 {
-    using var cts = new CancellationTokenSource();
-    var cancelLogged = 0;
-    Console.CancelKeyPress += (_, e) =>
-    {
-        e.Cancel = true;
-        if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
-        {
-            Logger.Info("shutdown requested");
-        }
-        cts.Cancel();
-    };
-
-    if (maxMessages.HasValue && maxMessages.Value <= 0)
-    {
-        Logger.Error("--max-messages must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
-    {
-        Logger.Error("--timeout-seconds must be greater than 0");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (timeoutSeconds.HasValue && !maxMessages.HasValue)
-    {
-        Logger.Error("--timeout-seconds requires --max-messages");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    if (!IsValidFormat(format))
-    {
-        Logger.Error("--format must be envelope or raw");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    var user = EnvReader.GetOptional("XWS_HL_USER");
-    if (string.IsNullOrWhiteSpace(user))
-    {
-        Logger.Error("missing required env var: XWS_HL_USER");
-        Environment.ExitCode = 1;
-        return;
-    }
-
-    var runner = new XwsRunner();
-    var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
     try
     {
-        var options = new WebSocketRunnerOptions
+        using var cts = new CancellationTokenSource();
+        var cancelLogged = 0;
+        Console.CancelKeyPress += (_, e) =>
         {
-            MaxMessages = maxMessages,
-            Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref cancelLogged, 1) == 0)
+            {
+                Logger.Info("shutdown requested");
+            }
+            cts.Cancel();
         };
 
-        var exitCode = await runner.RunHlPositionsAsync(user, options, format, cts.Token);
-        Environment.ExitCode = exitCode;
+        if (maxMessages.HasValue && maxMessages.Value <= 0)
+        {
+            Logger.Error("--max-messages must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+        {
+            Logger.Error("--timeout-seconds must be greater than 0");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (timeoutSeconds.HasValue && !maxMessages.HasValue)
+        {
+            Logger.Error("--timeout-seconds requires --max-messages");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        if (!IsValidFormat(format))
+        {
+            Logger.Error("--format must be envelope or raw");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var user = EnvReader.GetOptional("XWS_HL_USER");
+        if (string.IsNullOrWhiteSpace(user))
+        {
+            Logger.Error("missing required env var: XWS_HL_USER");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var runner = new XwsRunner();
+        var writerTask = WriteOutputAsync(runner.Output.Reader, cts.Token);
+        try
+        {
+            var options = new WebSocketRunnerOptions
+            {
+                MaxMessages = maxMessages,
+                Timeout = timeoutSeconds.HasValue ? TimeSpan.FromSeconds(timeoutSeconds.Value) : null
+            };
+
+            var exitCode = await runner.RunHlPositionsAsync(user, options, format, cts.Token);
+            Environment.ExitCode = exitCode;
+        }
+        catch (Exception ex)
+        {
+            Logger.Error($"hl subscribe positions failed: {ex.Message}");
+            Environment.ExitCode = 2;
+        }
+        finally
+        {
+            await writerTask;
+        }
     }
     catch (Exception ex)
     {
         Logger.Error($"hl subscribe positions failed: {ex.Message}");
-        Environment.ExitCode = 1;
-    }
-    finally
-    {
-        await writerTask;
+        Environment.ExitCode = 2;
     }
 }, maxMessagesOption, timeoutSecondsOption, formatOption);
 
@@ -592,7 +667,16 @@ if (!noDotenv)
     }
 }
 
-return await root.InvokeAsync(args);
+try
+{
+    var exitCode = await root.InvokeAsync(args);
+    return Environment.ExitCode != 0 ? Environment.ExitCode : exitCode;
+}
+catch (Exception ex)
+{
+    Logger.Error($"fatal: {ex.Message}");
+    return 2;
+}
 
 static bool ShouldEmit(string json, string? filter)
 {
@@ -662,6 +746,12 @@ static async Task WriteOutputAsync(ChannelReader<string> reader, CancellationTok
         }
     }
     catch (OperationCanceledException)
+    {
+    }
+    catch (IOException)
+    {
+    }
+    catch (ObjectDisposedException)
     {
     }
 }
