@@ -172,4 +172,4 @@
 - [x] Slice 54: Update PROMPTS.md for M9 slices
 - [x] Slice 55: Update DECISIONS.md for M9 architecture
 - [x] Slice 56: Update MILESTONES.md for M9 completion
-- [ ] Slice 57: Release prep (CHECKLIST, clean root, version bump, tag v0.9.0)
+- [x] Slice 57: Release prep (CHECKLIST, clean root, version bump, tag v0.9.0)
