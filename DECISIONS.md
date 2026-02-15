@@ -60,3 +60,10 @@
 - Hyperliquid WS channel assumptions for expanded data: `activeAssetCtx` for funding/mark price, `userEvents` for liquidations, `userFills` for fills (logged due to partial doc access).
 - MEXC futures WS channel assumptions for expanded data: `sub.fundingRate`/`push.fundingRate` and `sub.markPrice`/`push.markPrice` (logged due to partial doc access).
 - Paper execution CLI persists state to `artifacts/paper/state.json` to enable multi-command lifecycle demos (library default remains in-memory).
+
+## Milestone 9 (2026-02-14)
+
+- Assumption: baseline performance measurements recorded after refactor/early optimizations because pre-refactor (v0.8.0) timings were no longer available; document methodology accordingly in OPERATIONS.md.
+- Assumption: OKX/Bybit ping payload uses plain `ping`/`pong` text frames; added periodic ping and pong ignore in WS clients.
+- Assumption: `dotnet-counters` not available in environment; memory profiling performed via short-run process sampling instead of counters.
+- Assumption: testnet validation skipped due to missing credentials; documented setup steps in OPERATIONS.md.

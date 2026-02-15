@@ -1,4 +1,5 @@
 using xws.Core.Env;
+using xws.Exchanges.Okx.WebSocket;
 
 namespace xws.Exchanges.Okx;
 
@@ -16,7 +17,7 @@ public sealed class OkxConfig
         var wsOverride = EnvReader.GetOptional("XWS_OKX_WS_URL");
         var wsUri = wsOverride is not null
             ? new Uri(wsOverride)
-            : new Uri(OkxWs.PublicUrl);
+            : new Uri(OKXWebSocketClient.PublicUrl);
 
         return new OkxConfig(wsUri);
     }

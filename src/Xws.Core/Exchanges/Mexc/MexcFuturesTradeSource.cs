@@ -1,8 +1,7 @@
-using System.Net.WebSockets;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Channels;
 using xws.Core.Output;
+using xws.Exchanges.Mexc.WebSocket;
+using xws.Core.Shared.Logging;
 
 namespace xws.Exchanges.Mexc;
 
@@ -21,75 +20,28 @@ public static class MexcFuturesTradeSource
         }
 
         var config = MexcConfig.Load();
-        using var socket = new ClientWebSocket();
-        await socket.ConnectAsync(config.FuturesWsUri, cancellationToken);
-
-        foreach (var symbol in symbols)
+        var subscribePayloads = symbols.Select(symbol => System.Text.Json.JsonSerializer.Serialize(new
         {
-            var payload = new
-            {
-                method = "sub.deal",
-                param = new { symbol }
-            };
+            method = "sub.deal",
+            param = new { symbol }
+        }));
 
-            var json = JsonSerializer.Serialize(payload);
-            var bytes = Encoding.UTF8.GetBytes(json);
-            await socket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
-        }
-
-        using var pingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var pingTask = Task.Run(async () =>
-        {
-            using var timer = new PeriodicTimer(PingInterval);
-            while (await timer.WaitForNextTickAsync(pingCts.Token))
+        await MEXCWebSocketClient.RunAsync(
+            config.FuturesWsUri,
+            subscribePayloads,
+            PingInterval,
+            async (text, token) =>
             {
-                var pingPayload = Encoding.UTF8.GetBytes("{\"method\":\"ping\"}");
-                await socket.SendAsync(pingPayload, WebSocketMessageType.Text, true, pingCts.Token);
-            }
-        }, pingCts.Token);
-
-        var buffer = new byte[8192];
-        while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
-        {
-            var segment = new ArraySegment<byte>(buffer);
-            using var messageBuffer = new MemoryStream();
-            WebSocketReceiveResult result;
-            do
-            {
-                result = await socket.ReceiveAsync(segment, cancellationToken);
-                if (result.MessageType == WebSocketMessageType.Close)
+                if (MexcFuturesTradeDecoder.TryBuildEnvelope(text, symbols, out var envelope))
                 {
-                    pingCts.Cancel();
-                    await pingTask;
-                    return;
+                    await writer.WriteAsync(envelope, token);
                 }
-
-                messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
-            }
-            while (!result.EndOfMessage);
-
-            if (result.MessageType != WebSocketMessageType.Text)
-            {
-                continue;
-            }
-
-            var text = Encoding.UTF8.GetString(messageBuffer.ToArray());
-            if (string.Equals(text, "pong", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            if (MexcFuturesTradeDecoder.TryBuildEnvelope(text, symbols, out var envelope))
-            {
-                await writer.WriteAsync(envelope, cancellationToken);
-            }
-            else
-            {
-                Logger.Info($"mexc fut text frame: {text}");
-            }
-        }
-
-        pingCts.Cancel();
-        await pingTask;
+                else
+                {
+                    Logger.Info($"mexc fut text frame: {text}");
+                }
+            },
+            cancellationToken);
     }
 }
+

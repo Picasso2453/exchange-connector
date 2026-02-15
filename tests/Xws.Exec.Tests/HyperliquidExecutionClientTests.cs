@@ -2,7 +2,7 @@ using Xws.Exec;
 
 namespace Xws.Exec.Tests;
 
-public sealed class HyperliquidExecutionClientTests
+public sealed class HLExecutionClientTests
 {
     [Fact]
     public async Task PlaceAsync_CallsRest_AndMapsResult()
@@ -12,7 +12,7 @@ public sealed class HyperliquidExecutionClientTests
             PlaceResult = new HyperliquidPlaceResult("123", "open")
         };
         var config = new ExecutionConfig(ExecutionMode.Testnet, false, null);
-        var client = new HyperliquidExecutionClient(config, rest);
+        var client = new HLExecutionClient(config, rest);
 
         var request = new PlaceOrderRequest("HYPE", OrderSide.Buy, OrderType.Market, 1m);
         var result = await client.PlaceAsync(request, CancellationToken.None);
@@ -27,7 +27,7 @@ public sealed class HyperliquidExecutionClientTests
     {
         var rest = new CapturingRest();
         var config = new ExecutionConfig(ExecutionMode.Mainnet, true, "1");
-        var client = new HyperliquidExecutionClient(config, rest);
+        var client = new HLExecutionClient(config, rest);
 
         var request = new PlaceOrderRequest("HYPE", OrderSide.Buy, OrderType.Market, 1m);
         var result = await client.PlaceAsync(request, CancellationToken.None);
@@ -44,7 +44,7 @@ public sealed class HyperliquidExecutionClientTests
             CancelResult = new HyperliquidCancelResult("success")
         };
         var config = new ExecutionConfig(ExecutionMode.Testnet, false, null);
-        var client = new HyperliquidExecutionClient(config, rest);
+        var client = new HLExecutionClient(config, rest);
 
         var request = new CancelOrderRequest(OrderId: "1", Symbol: "HYPE");
         var result = await client.CancelAsync(request, CancellationToken.None);

@@ -19,7 +19,7 @@ public sealed class ExecutionClientFactoryTests
         var config = new ExecutionConfig(ExecutionMode.Testnet, false, null);
         var client = ExecutionClientFactory.Create(config, new FakeRest());
 
-        Assert.IsType<HyperliquidExecutionClient>(client);
+        Assert.IsType<HLExecutionClient>(client);
     }
 
     [Fact]
@@ -28,7 +28,7 @@ public sealed class ExecutionClientFactoryTests
         var config = new ExecutionConfig(ExecutionMode.Mainnet, true, "1");
         var client = ExecutionClientFactory.Create(config, new FakeRest());
 
-        Assert.IsType<HyperliquidExecutionClient>(client);
+        Assert.IsType<HLExecutionClient>(client);
     }
 
     [Theory]

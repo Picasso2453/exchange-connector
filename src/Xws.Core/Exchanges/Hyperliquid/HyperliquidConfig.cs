@@ -1,4 +1,6 @@
 using xws.Core.Env;
+using xws.Exchanges.Hyperliquid.Rest;
+using xws.Exchanges.Hyperliquid.WebSocket;
 
 namespace xws.Exchanges.Hyperliquid;
 
@@ -26,11 +28,11 @@ public sealed class HyperliquidConfig
 
         var wsUri = wsOverride is not null
             ? new Uri(wsOverride)
-            : new Uri(network == "testnet" ? HyperliquidWs.TestnetUrl : HyperliquidWs.MainnetUrl);
+            : new Uri(network == "testnet" ? HLWebSocketClient.TestnetUrl : HLWebSocketClient.MainnetUrl);
 
         var httpUri = httpOverride is not null
             ? new Uri(httpOverride)
-            : new Uri(network == "testnet" ? HyperliquidHttp.TestnetUrl : HyperliquidHttp.MainnetUrl);
+            : new Uri(network == "testnet" ? HLRestClient.TestnetUrl : HLRestClient.MainnetUrl);
 
         return new HyperliquidConfig(wsUri, httpUri);
     }

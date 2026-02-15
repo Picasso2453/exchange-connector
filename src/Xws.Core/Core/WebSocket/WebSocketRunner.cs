@@ -1,6 +1,8 @@
+using System.Buffers;
 using System.Net.WebSockets;
 using System.Text;
 using xws.Core.Output;
+using xws.Core.Shared.Logging;
 using xws.Core.Subscriptions;
 
 namespace xws.Core.WebSocket;
@@ -111,52 +113,90 @@ public sealed class WebSocketRunner
         RunState state,
         Func<string, Task>? frameHandler)
     {
-        var buffer = new byte[8192];
+        var buffer = ArrayPool<byte>.Shared.Rent(8192);
         var outcome = new ReceiveOutcome();
+        var staleTimeout = options.StaleTimeout;
+        using var pingCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var pingTask = StartPingLoopAsync(socket, options, pingCts.Token);
 
-        while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
+        try
         {
-            var segment = new ArraySegment<byte>(buffer);
-            using var messageBuffer = new MemoryStream();
-
-            WebSocketReceiveResult result;
-            do
+            while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
             {
-                result = await socket.ReceiveAsync(segment, cancellationToken);
+                var segment = new ArraySegment<byte>(buffer);
+                using var messageBuffer = new MemoryStream();
 
-                if (result.MessageType == WebSocketMessageType.Close)
+                WebSocketReceiveResult result;
+                using var staleCts = staleTimeout.HasValue
+                    ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+                    : null;
+                if (staleCts is not null)
                 {
-                    Logger.Info("remote closed connection");
+                    staleCts.CancelAfter(staleTimeout.GetValueOrDefault());
+                }
+
+                try
+                {
+                    do
+                    {
+                        var token = staleCts?.Token ?? cancellationToken;
+                        result = await socket.ReceiveAsync(segment, token);
+
+                        if (result.MessageType == WebSocketMessageType.Close)
+                        {
+                            Logger.Info("remote closed connection");
+                            return outcome;
+                        }
+
+                        messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
+                    }
+                    while (!result.EndOfMessage);
+                }
+                catch (OperationCanceledException) when (staleCts?.IsCancellationRequested == true && !cancellationToken.IsCancellationRequested)
+                {
+                    Logger.Error("connection appears stale, reconnecting");
                     return outcome;
                 }
 
-                messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
-            }
-            while (!result.EndOfMessage);
+                if (result.MessageType == WebSocketMessageType.Text)
+                {
+                    var text = messageBuffer.TryGetBuffer(out var bufferSegment)
+                        ? Encoding.UTF8.GetString(bufferSegment.Array!, bufferSegment.Offset, (int)messageBuffer.Length)
+                        : Encoding.UTF8.GetString(messageBuffer.ToArray());
+                    try
+                    {
+                        if (frameHandler is not null)
+                        {
+                            await frameHandler(text);
+                        }
+                        else
+                        {
+                            _writer.WriteLine(text);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error($"frame handler error: {ex.Message}");
+                    }
+                    outcome.ReceivedAny = true;
+                    state.MessageCount++;
 
-            if (result.MessageType == WebSocketMessageType.Text)
-            {
-                var text = Encoding.UTF8.GetString(messageBuffer.ToArray());
-                if (frameHandler is not null)
-                {
-                    await frameHandler(text);
-                }
-                else
-                {
-                    _writer.WriteLine(text);
-                }
-                outcome.ReceivedAny = true;
-                state.MessageCount++;
-
-                if (options.MaxMessages.HasValue && state.MessageCount >= options.MaxMessages.Value)
-                {
-                    outcome.MaxMessagesReached = true;
-                    return outcome;
+                    if (options.MaxMessages.HasValue && state.MessageCount >= options.MaxMessages.Value)
+                    {
+                        outcome.MaxMessagesReached = true;
+                        return outcome;
+                    }
                 }
             }
+
+            return outcome;
         }
-
-        return outcome;
+        finally
+        {
+            pingCts.Cancel();
+            await pingTask;
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     private async Task SendAllSubscriptionsAsync(ClientWebSocket socket, CancellationToken cancellationToken)
@@ -175,6 +215,24 @@ public sealed class WebSocketRunner
         return socket.SendAsync(segment, WebSocketMessageType.Text, true, cancellationToken);
     }
 
+    private static Task StartPingLoopAsync(ClientWebSocket socket, WebSocketRunnerOptions options, CancellationToken cancellationToken)
+    {
+        if (!options.PingInterval.HasValue || string.IsNullOrWhiteSpace(options.PingPayload))
+        {
+            return Task.CompletedTask;
+        }
+
+        var payload = Encoding.UTF8.GetBytes(options.PingPayload);
+        return Task.Run(async () =>
+        {
+            using var timer = new PeriodicTimer(options.PingInterval.Value);
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await socket.SendAsync(payload, WebSocketMessageType.Text, true, cancellationToken);
+            }
+        }, cancellationToken);
+    }
+
     private sealed class ReceiveOutcome
     {
         public bool ReceivedAny { get; set; }
@@ -186,3 +244,4 @@ public sealed class WebSocketRunner
         public int MessageCount { get; set; }
     }
 }
+

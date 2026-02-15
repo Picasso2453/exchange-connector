@@ -113,3 +113,63 @@
 - [x] Slice 53: DECISIONS.md updated with M8 architecture decisions
 - [x] Slice 54: MILESTONES.md updated with M8 completion and burst evaluations
 - [x] Slice 55: Release prep (CHECKLIST, clean root, version bump, tag v0.8.0)
+
+## Milestone 9 (In Progress)
+
+- [x] Slice 1: Create Xws.Core folder structure (Exchanges/{HL,OKX,Bybit,MEXC}/{WebSocket,Rest}, Shared/)
+- [x] Slice 2: Define core interfaces (IExchangeAdapter, IWebSocketClient, IMessageParser)
+- [x] Slice 3: Move shared utilities to Xws.Core/Shared (Logger)
+- [x] Slice 4: Run tests after folder restructure
+- [x] Slice 5: Refactor Hyperliquid adapter (WebSocket client/subscriptions/parser)
+- [x] Slice 6: Extract Hyperliquid REST client
+- [x] Slice 7: Refactor Hyperliquid execution adapter (Exec/Exchanges/HL)
+- [x] Slice 8: Run HL-specific tests
+- [x] Slice 9: Refactor OKX adapter (WebSocket client/subscriptions/parser)
+- [x] Slice 10: Refactor OKX execution adapter (Exec/Exchanges/OKX)
+- [x] Slice 11: Extract OKX shared logic (auth/config)
+- [x] Slice 12: Run OKX-specific tests
+- [x] Slice 13: Refactor Bybit adapter (WebSocket client/subscriptions/parser)
+- [x] Slice 14: Refactor Bybit execution adapter (Exec/Exchanges/Bybit)
+- [x] Slice 15: Refactor MEXC adapter (WebSocket client/parser)
+- [x] Slice 16: Run Bybit/MEXC-specific tests
+- [x] Slice 17: Refactor xws CLI Program.cs (Commands/)
+- [x] Slice 18: Refactor xws.exec.cli Program.cs (Commands/ + Execution/)
+- [x] Slice 19: Consolidate paper state management (versioning + recovery)
+- [x] Slice 20: Run full CLI test suite after refactor
+- [x] Slice 21: Measure v0.8.0 baseline performance
+- [x] Slice 22: Profile WebSocket parsing allocations
+- [x] Slice 23: Optimize WebSocket parsing (buffer reuse, allocations)
+- [x] Slice 24: Benchmark optimized parsing, document results
+- [x] Slice 25: Optimize REST clients (pooling/keep-alive/timeouts)
+- [x] Slice 26: Optimize paper execution state lookups
+- [x] Slice 27: Profile memory usage (long-running stream)
+- [x] Slice 28: Fix memory leaks, dispose on reconnect
+- [x] Slice 29: Implement rate limiter abstraction
+- [x] Slice 30: Add HL rate limiting (20/sec default)
+- [x] Slice 31: Add OKX/Bybit rate limiting (10/sec default)
+- [x] Slice 32: Test rate limiting (20 rapid orders)
+- [x] Slice 33: Improve reconnect logic (stale detection)
+- [x] Slice 34: Add connection health monitoring (ping/pong)
+- [x] Slice 35: Handle edge cases (partial/corrupt frames)
+- [x] Slice 36: Test connection stability (simulate interruption)
+- [x] Slice 37: Standardize error handling patterns
+- [x] Slice 38: Improve error messages (context + guidance)
+- [x] Slice 39: Harden paper state persistence (versioning + recovery)
+- [x] Slice 40: Test state corruption recovery
+- [x] Slice 41: Add unit tests for refactored modules
+- [x] Slice 42: Add integration tests (mux + multi-exchange exec)
+- [x] Slice 43: Add load tests (1000+ msg/sec, rapid orders)
+- [x] Slice 44: Measure test coverage (XPlat Code Coverage)
+- [x] Slice 45: Add edge case tests (malformed JSON, 429)
+- [x] Slice 46: Add state corruption tests
+- [x] Slice 47: Testnet validation HL
+- [x] Slice 48: Testnet validation OKX or Bybit
+- [x] Slice 49: Create ARCHITECTURE.md
+- [x] Slice 50: Create/expand OPERATIONS.md
+- [x] Slice 51: Add performance section to OPERATIONS.md
+- [x] Slice 52: Document testnet setup in OPERATIONS.md
+- [x] Slice 53: Update PROJECT.md for M9 scope
+- [x] Slice 54: Update PROMPTS.md for M9 slices
+- [x] Slice 55: Update DECISIONS.md for M9 architecture
+- [x] Slice 56: Update MILESTONES.md for M9 completion
+- [ ] Slice 57: Release prep (CHECKLIST, clean root, version bump, tag v0.9.0)

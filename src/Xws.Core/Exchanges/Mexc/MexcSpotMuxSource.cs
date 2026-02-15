@@ -1,7 +1,9 @@
+using System.Buffers;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading.Channels;
 using xws.Core.Output;
+using xws.Core.Shared.Logging;
 
 namespace xws.Exchanges.Mexc;
 
@@ -40,58 +42,65 @@ public static class MexcSpotMuxSource
             }
         }, pingCts.Token);
 
-        var buffer = new byte[8192];
-        while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
+        var buffer = ArrayPool<byte>.Shared.Rent(8192);
+        try
         {
-            var segment = new ArraySegment<byte>(buffer);
-            using var messageBuffer = new MemoryStream();
-            WebSocketReceiveResult result;
-            do
+            while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
             {
-                result = await socket.ReceiveAsync(segment, cancellationToken);
-                if (result.MessageType == WebSocketMessageType.Close)
+                var segment = new ArraySegment<byte>(buffer);
+                using var messageBuffer = new MemoryStream();
+                WebSocketReceiveResult result;
+                do
                 {
-                    pingCts.Cancel();
-                    await pingTask;
-                    return;
-                }
+                    result = await socket.ReceiveAsync(segment, cancellationToken);
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        return;
+                    }
 
-                messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
-            }
-            while (!result.EndOfMessage);
+                    messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
+                }
+                while (!result.EndOfMessage);
 
-            if (result.MessageType == WebSocketMessageType.Text)
-            {
-                var text = Encoding.UTF8.GetString(messageBuffer.ToArray());
-                if (!string.Equals(text, "PONG", StringComparison.OrdinalIgnoreCase))
+                if (result.MessageType == WebSocketMessageType.Text)
                 {
-                    Logger.Info($"mexc spot text frame: {text}");
+                    var text = messageBuffer.TryGetBuffer(out var bufferSegment)
+                        ? Encoding.UTF8.GetString(bufferSegment.Array!, bufferSegment.Offset, (int)messageBuffer.Length)
+                        : Encoding.UTF8.GetString(messageBuffer.ToArray());
+                    if (!string.Equals(text, "PONG", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Logger.Info($"mexc spot text frame: {text}");
+                    }
                 }
-            }
-            else if (result.MessageType == WebSocketMessageType.Binary)
-            {
-                var payloadBytes = messageBuffer.ToArray();
-                if (MexcSpotProtoDecoder.TryDecodeToJsonElement(payloadBytes, out var jsonElement))
+                else if (result.MessageType == WebSocketMessageType.Binary)
                 {
-                    var envelope = new EnvelopeV1(
-                        "xws.envelope.v1",
-                        "mexc",
-                        "spot",
-                        "trades",
-                        symbols,
-                        DateTimeOffset.UtcNow.ToString("O"),
-                        jsonElement,
-                        "json");
-                    await writer.WriteAsync(envelope, cancellationToken);
-                }
-                else
-                {
-                    Logger.Error("mexc spot protobuf decode failed");
+                    var payloadBytes = messageBuffer.ToArray();
+                    if (MexcSpotProtoDecoder.TryDecodeToJsonElement(payloadBytes, out var jsonElement))
+                    {
+                        var envelope = new EnvelopeV1(
+                            "xws.envelope.v1",
+                            "mexc",
+                            "spot",
+                            "trades",
+                            symbols,
+                            DateTimeOffset.UtcNow.ToString("O"),
+                            jsonElement,
+                            "json");
+                        await writer.WriteAsync(envelope, cancellationToken);
+                    }
+                    else
+                    {
+                        Logger.Error("mexc spot protobuf decode failed");
+                    }
                 }
             }
         }
-
-        pingCts.Cancel();
-        await pingTask;
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+            pingCts.Cancel();
+            await pingTask;
+        }
     }
 }
+

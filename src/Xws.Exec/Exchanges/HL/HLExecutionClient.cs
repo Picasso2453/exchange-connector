@@ -2,12 +2,12 @@ using System.Linq;
 
 namespace Xws.Exec;
 
-public sealed class HyperliquidExecutionClient : IExecutionClient
+public sealed class HLExecutionClient : IExecutionClient
 {
     private readonly ExecutionConfig _config;
     private readonly IHyperliquidRest _rest;
 
-    public HyperliquidExecutionClient(ExecutionConfig config, IHyperliquidRest rest)
+    public HLExecutionClient(ExecutionConfig config, IHyperliquidRest rest)
     {
         _config = config;
         _rest = rest;

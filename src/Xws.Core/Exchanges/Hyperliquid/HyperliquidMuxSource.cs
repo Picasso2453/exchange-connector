@@ -1,8 +1,8 @@
-using System.Text.Json;
 using System.Threading.Channels;
 using xws.Core.Output;
 using xws.Core.Subscriptions;
 using xws.Core.WebSocket;
+using xws.Exchanges.Hyperliquid.WebSocket;
 
 namespace xws.Exchanges.Hyperliquid;
 
@@ -18,7 +18,7 @@ public static class HyperliquidMuxSource
             writer,
             cancellationToken,
             "funding",
-            HyperliquidWs.BuildFundingSubscription);
+            HLSubscriptionBuilder.BuildFundingSubscription);
     }
 
     public static async Task RunLiquidationsAsync(
@@ -29,7 +29,7 @@ public static class HyperliquidMuxSource
     {
         var config = HyperliquidConfig.Load();
         var registry = new SubscriptionRegistry();
-        registry.Add(HyperliquidWs.BuildLiquidationsSubscription(user));
+        registry.Add(HLSubscriptionBuilder.BuildLiquidationsSubscription(user));
 
         var runner = new WebSocketRunner(new JsonlWriter(_ => { }), registry);
         var options = new WebSocketRunnerOptions
@@ -47,28 +47,11 @@ public static class HyperliquidMuxSource
                 EnvelopeV1 envelope;
                 try
                 {
-                    var payload = JsonSerializer.Deserialize<JsonElement>(frame);
-                    envelope = new EnvelopeV1(
-                        "xws.envelope.v1",
-                        "hl",
-                        null,
-                        "liquidations",
-                        symbols,
-                        DateTimeOffset.UtcNow.ToString("O"),
-                        payload,
-                        "json");
+                    envelope = HLMessageParser.BuildEnvelope("liquidations", symbols, frame);
                 }
                 catch
                 {
-                    envelope = new EnvelopeV1(
-                        "xws.envelope.v1",
-                        "hl",
-                        null,
-                        "liquidations",
-                        symbols,
-                        DateTimeOffset.UtcNow.ToString("O"),
-                        frame,
-                        "text");
+                    envelope = HLMessageParser.BuildEnvelope("liquidations", symbols, frame);
                 }
 
                 await writer.WriteAsync(envelope, cancellationToken);
@@ -85,7 +68,7 @@ public static class HyperliquidMuxSource
             writer,
             cancellationToken,
             "markprice",
-            HyperliquidWs.BuildMarkPriceSubscription);
+            HLSubscriptionBuilder.BuildMarkPriceSubscription);
     }
 
     public static async Task RunTradesAsync(
@@ -98,7 +81,20 @@ public static class HyperliquidMuxSource
             writer,
             cancellationToken,
             "trades",
-            HyperliquidWs.BuildTradesSubscription);
+            HLSubscriptionBuilder.BuildTradesSubscription);
+    }
+
+    public static async Task RunL2Async(
+        string[] symbols,
+        ChannelWriter<EnvelopeV1> writer,
+        CancellationToken cancellationToken)
+    {
+        await RunStreamAsync(
+            symbols,
+            writer,
+            cancellationToken,
+            "l2",
+            HLSubscriptionBuilder.BuildL2BookSubscription);
     }
 
     public static async Task RunFillsAsync(
@@ -109,7 +105,7 @@ public static class HyperliquidMuxSource
     {
         var config = HyperliquidConfig.Load();
         var registry = new SubscriptionRegistry();
-        registry.Add(HyperliquidWs.BuildUserFillsSubscription(user));
+        registry.Add(HLSubscriptionBuilder.BuildUserFillsSubscription(user));
 
         var runner = new WebSocketRunner(new JsonlWriter(_ => { }), registry);
         var options = new WebSocketRunnerOptions
@@ -127,28 +123,11 @@ public static class HyperliquidMuxSource
                 EnvelopeV1 envelope;
                 try
                 {
-                    var payload = JsonSerializer.Deserialize<JsonElement>(frame);
-                    envelope = new EnvelopeV1(
-                        "xws.envelope.v1",
-                        "hl",
-                        null,
-                        "fills",
-                        symbols,
-                        DateTimeOffset.UtcNow.ToString("O"),
-                        payload,
-                        "json");
+                    envelope = HLMessageParser.BuildEnvelope("fills", symbols, frame);
                 }
                 catch
                 {
-                    envelope = new EnvelopeV1(
-                        "xws.envelope.v1",
-                        "hl",
-                        null,
-                        "fills",
-                        symbols,
-                        DateTimeOffset.UtcNow.ToString("O"),
-                        frame,
-                        "text");
+                    envelope = HLMessageParser.BuildEnvelope("fills", symbols, frame);
                 }
 
                 await writer.WriteAsync(envelope, cancellationToken);
@@ -185,28 +164,11 @@ public static class HyperliquidMuxSource
                 EnvelopeV1 envelope;
                 try
                 {
-                    var payload = JsonSerializer.Deserialize<JsonElement>(frame);
-                    envelope = new EnvelopeV1(
-                        "xws.envelope.v1",
-                        "hl",
-                        null,
-                        envelopeType,
-                        symbols,
-                        DateTimeOffset.UtcNow.ToString("O"),
-                        payload,
-                        "json");
+                    envelope = HLMessageParser.BuildEnvelope(envelopeType, symbols, frame);
                 }
                 catch
                 {
-                    envelope = new EnvelopeV1(
-                        "xws.envelope.v1",
-                        "hl",
-                        null,
-                        envelopeType,
-                        symbols,
-                        DateTimeOffset.UtcNow.ToString("O"),
-                        frame,
-                        "text");
+                    envelope = HLMessageParser.BuildEnvelope(envelopeType, symbols, frame);
                 }
 
                 await writer.WriteAsync(envelope, cancellationToken);

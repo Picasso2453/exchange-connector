@@ -1,10 +1,12 @@
 using xws.Core.Env;
 using xws.Core.Mux;
 using xws.Core.Output;
+using xws.Core.Shared.Logging;
 using xws.Core.Subscriptions;
 using xws.Core.WebSocket;
 using xws.Exchanges.Bybit;
 using xws.Exchanges.Hyperliquid;
+using xws.Exchanges.Hyperliquid.WebSocket;
 using xws.Exchanges.Mexc;
 using xws.Exchanges.Okx;
 
@@ -19,14 +21,20 @@ public sealed class XwsRunner
         try
         {
             var config = HyperliquidConfig.Load();
-            var subscription = HyperliquidWs.BuildTradesSubscription(symbol);
+            var subscription = HLSubscriptionBuilder.BuildTradesSubscription(symbol);
             IJsonlWriter writer = format == "raw"
                 ? new JsonlWriter(line => Output.Writer.TryWrite(line))
                 : new EnvelopeWriter("hl", "trades", null, new[] { symbol }, line => Output.Writer.TryWrite(line));
             var registry = new SubscriptionRegistry();
             registry.Add(subscription);
             var runner = new WebSocketRunner(writer, registry);
-            return await runner.RunAsync(config.WsUri, options, cancellationToken);
+            var runnerOptions = new WebSocketRunnerOptions
+            {
+                MaxMessages = options.MaxMessages,
+                Timeout = options.Timeout,
+                StaleTimeout = options.StaleTimeout ?? TimeSpan.FromSeconds(60)
+            };
+            return await runner.RunAsync(config.WsUri, runnerOptions, cancellationToken);
         }
         finally
         {
@@ -39,14 +47,20 @@ public sealed class XwsRunner
         try
         {
             var config = HyperliquidConfig.Load();
-            var subscription = HyperliquidWs.BuildL2BookSubscription(symbol);
+            var subscription = HLSubscriptionBuilder.BuildL2BookSubscription(symbol);
             IJsonlWriter writer = format == "raw"
                 ? new JsonlWriter(line => Output.Writer.TryWrite(line))
                 : new EnvelopeWriter("hl", "l2", null, new[] { symbol }, line => Output.Writer.TryWrite(line));
             var registry = new SubscriptionRegistry();
             registry.Add(subscription);
             var runner = new WebSocketRunner(writer, registry);
-            return await runner.RunAsync(config.WsUri, options, cancellationToken);
+            var runnerOptions = new WebSocketRunnerOptions
+            {
+                MaxMessages = options.MaxMessages,
+                Timeout = options.Timeout,
+                StaleTimeout = options.StaleTimeout ?? TimeSpan.FromSeconds(60)
+            };
+            return await runner.RunAsync(config.WsUri, runnerOptions, cancellationToken);
         }
         finally
         {
@@ -59,7 +73,7 @@ public sealed class XwsRunner
         try
         {
             var config = HyperliquidConfig.Load();
-            var subscription = HyperliquidWs.BuildCandleSubscription(symbol, interval);
+            var subscription = HLSubscriptionBuilder.BuildCandleSubscription(symbol, interval);
             IJsonlWriter writer = format == "raw"
                 ? new JsonlWriter(line => Output.Writer.TryWrite(line))
                 : new EnvelopeWriter("hl", "candle", null, new[] { symbol }, line => Output.Writer.TryWrite(line));
@@ -79,7 +93,7 @@ public sealed class XwsRunner
         try
         {
             var config = HyperliquidConfig.Load();
-            var subscription = HyperliquidWs.BuildClearinghouseStateSubscription(user);
+            var subscription = HLSubscriptionBuilder.BuildClearinghouseStateSubscription(user);
             IJsonlWriter writer = format == "raw"
                 ? new JsonlWriter(line => Output.Writer.TryWrite(line))
                 : new EnvelopeWriter("hl", "positions", null, null, line => Output.Writer.TryWrite(line));
@@ -166,6 +180,12 @@ public sealed class XwsRunner
             var runner = new MuxRunner(new JsonlWriter(line => Output.Writer.TryWrite(line)));
             var producers = subscriptions.Select(sub => (Func<System.Threading.Channels.ChannelWriter<EnvelopeV1>, CancellationToken, Task>)(async (writer, token) =>
             {
+                if (sub.Exchange.Equals("hl", StringComparison.OrdinalIgnoreCase))
+                {
+                    await HyperliquidMuxSource.RunL2Async(sub.Symbols, writer, token);
+                    return;
+                }
+
                 if (sub.Exchange.Equals("mexc", StringComparison.OrdinalIgnoreCase)
                     && string.Equals(sub.Market, "fut", StringComparison.OrdinalIgnoreCase))
                 {
@@ -356,3 +376,4 @@ public sealed class XwsRunner
         }
     }
 }
+

@@ -9,7 +9,7 @@ public sealed class HyperliquidCancelAllTests
     {
         var rest = new CancelAllRest();
         var config = new ExecutionConfig(ExecutionMode.Testnet, false, null, UserAddress: "0xabc");
-        var client = new HyperliquidExecutionClient(config, rest);
+        var client = new HLExecutionClient(config, rest);
 
         var result = await client.CancelAllAsync(new CancelAllRequest(), CancellationToken.None);
 
@@ -31,7 +31,7 @@ public sealed class HyperliquidCancelAllTests
             ]
         };
         var config = new ExecutionConfig(ExecutionMode.Testnet, false, null, UserAddress: "0xabc");
-        var client = new HyperliquidExecutionClient(config, rest);
+        var client = new HLExecutionClient(config, rest);
 
         var result = await client.CancelAllAsync(new CancelAllRequest(), CancellationToken.None);
 
@@ -48,7 +48,7 @@ public sealed class HyperliquidCancelAllTests
             OpenOrders = [new HyperliquidOpenOrder("1", null, "HYPE")]
         };
         var config = new ExecutionConfig(ExecutionMode.Mainnet, false, null, UserAddress: "0xabc");
-        var client = new HyperliquidExecutionClient(config, rest);
+        var client = new HLExecutionClient(config, rest);
 
         var result = await client.CancelAllAsync(new CancelAllRequest(), CancellationToken.None);
 

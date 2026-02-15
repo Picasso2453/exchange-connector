@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Threading.Channels;
 using xws.Core.Output;
+using xws.Core.Shared.Logging;
 
 namespace xws.Core.Mux;
 
@@ -110,3 +111,4 @@ public sealed class MuxRunner
         return 0;
     }
 }
+

@@ -1,13 +1,10 @@
 using System.Text.Json;
 using xws.Core.Subscriptions;
 
-namespace xws.Exchanges.Hyperliquid;
+namespace xws.Exchanges.Hyperliquid.WebSocket;
 
-public static class HyperliquidWs
+public static class HLSubscriptionBuilder
 {
-    public const string MainnetUrl = "wss://api.hyperliquid.xyz/ws";
-    public const string TestnetUrl = "wss://api.hyperliquid-testnet.xyz/ws";
-
     public static SubscriptionRequest BuildTradesSubscription(string symbol)
     {
         var payload = new
@@ -54,22 +51,6 @@ public static class HyperliquidWs
         };
 
         var key = new SubscriptionKey("candle", $"coin={symbol};interval={interval}");
-        return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
-    }
-
-    public static SubscriptionRequest BuildClearinghouseStateSubscription(string user)
-    {
-        var payload = new
-        {
-            method = "subscribe",
-            subscription = new
-            {
-                type = "clearinghouseState",
-                user
-            }
-        };
-
-        var key = new SubscriptionKey("clearinghouseState", $"user={user}");
         return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
     }
 
@@ -134,6 +115,22 @@ public static class HyperliquidWs
         };
 
         var key = new SubscriptionKey("userFills", $"user={user}");
+        return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
+    }
+
+    public static SubscriptionRequest BuildClearinghouseStateSubscription(string user)
+    {
+        var payload = new
+        {
+            method = "subscribe",
+            subscription = new
+            {
+                type = "clearinghouseState",
+                user
+            }
+        };
+
+        var key = new SubscriptionKey("clearinghouseState", $"user={user}");
         return new SubscriptionRequest(key, JsonSerializer.Serialize(payload));
     }
 }

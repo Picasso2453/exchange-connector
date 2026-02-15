@@ -110,3 +110,11 @@ dotnet run --project src/xws -- --help
 - Expanded Hyperliquid + MEXC market data (funding, liquidations, mark price, fills)
 - Execution CLI expanded: amend + query orders/positions + multi-exchange flag
 - Paper demo scripts + Quick Start documentation
+
+## Milestone 9 - Optimization & Hardening
+- Refactored exchange adapters into structured modules (WebSocket/Rest/Shared)
+- CLI command wiring extracted to command modules (xws + xws.exec.cli)
+- WebSocket parsing allocation reductions (pooled buffers, decoding optimizations)
+- Rate limiting scaffolding in exec layer with env var overrides
+- Connection health monitoring (stale detection, ping/pong on OKX/Bybit)
+- Added ARCHITECTURE.md and OPERATIONS.md

@@ -9,12 +9,10 @@ public static class ExecutionClientFactory
             return new PaperExecutionClient(config.Mode, config.PaperStatePath);
         }
 
-        if (rest is null)
-        {
-            throw new ArgumentNullException(nameof(rest));
-        }
-
-        return new HyperliquidExecutionClient(config, rest);
+        var resolved = rest ?? new HyperliquidRest();
+        var limiter = RateLimiterFactory.CreateHyperliquid();
+        var throttled = new RateLimitedHyperliquidRest(resolved, limiter);
+        return new HLExecutionClient(config, throttled);
     }
 
     public static IExecutionClient Create(
@@ -26,12 +24,18 @@ public static class ExecutionClientFactory
     {
         if (string.Equals(exchange, "okx", StringComparison.OrdinalIgnoreCase))
         {
-            return new OkxExecutionClient(config, okxRest);
+            var throttled = okxRest is null
+                ? null
+                : new RateLimitedOkxRest(okxRest, RateLimiterFactory.CreateOkx());
+            return new OkxExecutionClient(config, throttled);
         }
 
         if (string.Equals(exchange, "bybit", StringComparison.OrdinalIgnoreCase))
         {
-            return new BybitExecutionClient(config, bybitRest);
+            var throttled = bybitRest is null
+                ? null
+                : new RateLimitedBybitRest(bybitRest, RateLimiterFactory.CreateBybit());
+            return new BybitExecutionClient(config, throttled);
         }
 
         if (string.Equals(exchange, "mexc", StringComparison.OrdinalIgnoreCase))

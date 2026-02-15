@@ -1,4 +1,5 @@
 using xws.Core.Env;
+using xws.Exchanges.Bybit.WebSocket;
 
 namespace xws.Exchanges.Bybit;
 
@@ -20,11 +21,11 @@ public sealed class BybitConfig
 
         var spotUri = spotOverride is not null
             ? new Uri(spotOverride)
-            : new Uri(BybitWs.SpotPublicUrl);
+            : new Uri(BybitWebSocketClient.SpotPublicUrl);
 
         var futuresUri = futOverride is not null
             ? new Uri(futOverride)
-            : new Uri(BybitWs.FuturesPublicUrl);
+            : new Uri(BybitWebSocketClient.FuturesPublicUrl);
 
         return new BybitConfig(spotUri, futuresUri);
     }

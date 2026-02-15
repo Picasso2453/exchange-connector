@@ -1,8 +1,6 @@
-using System.Net.WebSockets;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Channels;
 using xws.Core.Output;
+using xws.Exchanges.Bybit.WebSocket;
 
 namespace xws.Exchanges.Bybit;
 
@@ -61,66 +59,15 @@ public static class BybitMuxSource
             ? config.SpotWsUri
             : config.FuturesWsUri;
 
-        using var socket = new ClientWebSocket();
-        await socket.ConnectAsync(wsUri, cancellationToken);
-
-        var args = symbols.Select(symbol => $"{channelPrefix}.{symbol}").ToArray();
-        var payload = JsonSerializer.Serialize(new { op = "subscribe", args });
-        var bytes = Encoding.UTF8.GetBytes(payload);
-        await socket.SendAsync(bytes, WebSocketMessageType.Text, true, cancellationToken);
-
-        var buffer = new byte[8192];
-        while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
-        {
-            var segment = new ArraySegment<byte>(buffer);
-            using var messageBuffer = new MemoryStream();
-            WebSocketReceiveResult result;
-            do
+        var payload = BybitSubscriptionBuilder.BuildSubscribePayload(channelPrefix, symbols);
+        await BybitWebSocketClient.RunAsync(
+            wsUri,
+            payload,
+            async (text, token) =>
             {
-                result = await socket.ReceiveAsync(segment, cancellationToken);
-                if (result.MessageType == WebSocketMessageType.Close)
-                {
-                    return;
-                }
-
-                messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
-            }
-            while (!result.EndOfMessage);
-
-            if (result.MessageType != WebSocketMessageType.Text)
-            {
-                continue;
-            }
-
-            var text = Encoding.UTF8.GetString(messageBuffer.ToArray());
-            EnvelopeV1 envelope;
-            try
-            {
-                var payloadJson = JsonSerializer.Deserialize<JsonElement>(text);
-                envelope = new EnvelopeV1(
-                    "xws.envelope.v1",
-                    "bybit",
-                    market,
-                    stream,
-                    symbols,
-                    DateTimeOffset.UtcNow.ToString("O"),
-                    payloadJson,
-                    "json");
-            }
-            catch
-            {
-                envelope = new EnvelopeV1(
-                    "xws.envelope.v1",
-                    "bybit",
-                    market,
-                    stream,
-                    symbols,
-                    DateTimeOffset.UtcNow.ToString("O"),
-                    text,
-                    "text");
-            }
-
-            await writer.WriteAsync(envelope, cancellationToken);
-        }
+                var envelope = BybitMessageParser.BuildEnvelope(market, stream, symbols, text);
+                await writer.WriteAsync(envelope, token);
+            },
+            cancellationToken);
     }
 }

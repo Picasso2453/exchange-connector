@@ -1,9 +1,11 @@
+using System.Buffers;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Channels;
 using Google.Protobuf;
 using xws.Core.Output;
+using xws.Core.Shared.Logging;
 
 namespace xws.Exchanges.Mexc;
 
@@ -58,7 +60,7 @@ public sealed class MexcSpotTradeSubscriber
             "spot",
             symbols,
             line => output.TryWrite(line));
-        var buffer = new byte[8192];
+        var buffer = ArrayPool<byte>.Shared.Rent(8192);
         var messageCount = 0;
 
         using var pingCts = CancellationTokenSource.CreateLinkedTokenSource(runToken);
@@ -72,61 +74,71 @@ public sealed class MexcSpotTradeSubscriber
             }
         }, pingCts.Token);
 
-        while (!runToken.IsCancellationRequested && socket.State == WebSocketState.Open)
+        try
         {
-            var segment = new ArraySegment<byte>(buffer);
-            using var messageBuffer = new MemoryStream();
-            WebSocketReceiveResult result;
-            do
+            while (!runToken.IsCancellationRequested && socket.State == WebSocketState.Open)
             {
-                result = await socket.ReceiveAsync(segment, runToken);
-                if (result.MessageType == WebSocketMessageType.Close)
+                var segment = new ArraySegment<byte>(buffer);
+                using var messageBuffer = new MemoryStream();
+                WebSocketReceiveResult result;
+                do
                 {
-                    return 0;
+                    result = await socket.ReceiveAsync(segment, runToken);
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        return 0;
+                    }
+
+                    messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
                 }
+                while (!result.EndOfMessage);
 
-                messageBuffer.Write(segment.Array!, segment.Offset, result.Count);
+                if (result.MessageType == WebSocketMessageType.Text)
+                {
+                    var text = messageBuffer.TryGetBuffer(out var bufferSegment)
+                        ? Encoding.UTF8.GetString(bufferSegment.Array!, bufferSegment.Offset, (int)messageBuffer.Length)
+                        : Encoding.UTF8.GetString(messageBuffer.ToArray());
+                    if (!string.Equals(text, "PONG", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Logger.Info($"mexc spot text frame: {text}");
+                    }
+                }
+                else if (result.MessageType == WebSocketMessageType.Binary)
+                {
+                    var payloadBytes = messageBuffer.ToArray();
+                    if (MexcSpotProtoDecoder.TryDecodeToJsonElement(payloadBytes, out var jsonElement))
+                    {
+                        writer.WriteRawJson(jsonElement.ToString());
+                        messageCount++;
+                    }
+                    else
+                    {
+                        Logger.Error("mexc spot protobuf decode failed");
+                    }
+
+                    if (maxMessages.HasValue && messageCount >= maxMessages.Value)
+                    {
+                        pingCts.Cancel();
+                        await pingTask;
+                        return 0;
+                    }
+                }
             }
-            while (!result.EndOfMessage);
 
-            if (result.MessageType == WebSocketMessageType.Text)
+            if (timeoutCts?.IsCancellationRequested == true)
             {
-                var text = Encoding.UTF8.GetString(messageBuffer.ToArray());
-                if (!string.Equals(text, "PONG", StringComparison.OrdinalIgnoreCase))
-                {
-                    Logger.Info($"mexc spot text frame: {text}");
-                }
+                Logger.Error("mexc spot timeout reached");
+                return 1;
             }
-            else if (result.MessageType == WebSocketMessageType.Binary)
-            {
-                var payloadBytes = messageBuffer.ToArray();
-                if (MexcSpotProtoDecoder.TryDecodeToJsonElement(payloadBytes, out var jsonElement))
-                {
-                    writer.WriteRawJson(jsonElement.ToString());
-                    messageCount++;
-                }
-                else
-                {
-                    Logger.Error("mexc spot protobuf decode failed");
-                }
 
-                if (maxMessages.HasValue && messageCount >= maxMessages.Value)
-                {
-                    pingCts.Cancel();
-                    await pingTask;
-                    return 0;
-                }
-            }
+            return 0;
         }
-
-        if (timeoutCts?.IsCancellationRequested == true)
+        finally
         {
-            Logger.Error("mexc spot timeout reached");
-            return 1;
+            ArrayPool<byte>.Shared.Return(buffer);
+            pingCts.Cancel();
+            await pingTask;
         }
-
-        pingCts.Cancel();
-        await pingTask;
-        return 0;
     }
 }
+

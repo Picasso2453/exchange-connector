@@ -101,3 +101,70 @@
 - Scope: PROJECT/PROMPTS/DECISIONS/MILESTONES/CHECKLIST updates, version bump, release prep.
 - Outcome: documentation aligned with M8 delivery; version bumped to 0.8.0.
 - Uncertainty eliminated: release metadata alignment with delivered scope.
+
+## Milestone 9 - Optimization & Hardening (Complete, 2026-02-15)
+
+### Burst 1 - Core Foundations
+- Scope: new folder structure, shared interfaces, shared logging utility.
+- Outcome: Xws.Core scaffolding for refactor; Logger moved to Shared/Logging.
+- Uncertainty eliminated: feasibility of Shared namespace split without regressions.
+
+### Burst 2 - Hyperliquid Refactor
+- Scope: HL WS subscription builder/parser/client split, HL REST client extraction, HL execution client refactor.
+- Outcome: HL adapter moved into structured modules; execution client reorganized under Exec/Exchanges/HL.
+- Uncertainty eliminated: Hyperliquid refactor compatibility with existing runtime and tests.
+
+### Burst 3 - OKX Refactor
+- Scope: OKX WS split (client/subscription/parser), OKX execution adapter refactor, shared auth/config.
+- Outcome: OKX modules reorganized under Exchanges/OKX with shared helpers.
+- Uncertainty eliminated: OKX refactor compatibility with mux and execution surfaces.
+
+### Burst 4 - Bybit & MEXC Refactor
+- Scope: Bybit WS split (client/subscription/parser), Bybit execution adapter refactor, MEXC WS client/parser extraction.
+- Outcome: Bybit modules reorganized under Exchanges/Bybit; MEXC futures sources unified under shared WS client.
+- Uncertainty eliminated: Bybit/MEXC refactor compatibility with mux sources and tests.
+
+### Burst 5 - CLI & Paper State Refactor
+- Scope: xws CLI command extraction, xws.exec.cli command extraction, paper state versioning and recovery.
+- Outcome: CLI programs simplified; paper state stored with version metadata and corruption handling.
+- Uncertainty eliminated: CLI refactor safety and paper state persistence robustness.
+
+### Burst 6 - Baseline & WebSocket Optimization
+- Scope: baseline timing capture, allocation review for WS clients, buffer reuse and text decoding improvements.
+- Outcome: WS clients use pooled buffers and avoid extra allocations; baseline timing captured for paper place command.
+- Uncertainty eliminated: feasibility of reducing WS parsing allocations without changing output.
+
+### Burst 7 - Execution & Memory Optimization
+- Scope: paper state lookup optimization, memory sampling during long-running emit, pooled buffers in spot protobuf paths.
+- Outcome: paper client uses clientOrderId index; memory samples captured during extended emit run.
+- Uncertainty eliminated: paper execution lookup scalability and absence of immediate memory growth during emit workload.
+
+### Burst 8 - Rate Limiting
+- Scope: token-bucket limiter, HL/OKX/Bybit rate limiter wrappers, rapid-order smoke test.
+- Outcome: rate limiter scaffolding in exec layer with env var overrides; rapid orders completed without errors.
+- Uncertainty eliminated: ability to throttle REST calls without breaking paper workflows.
+
+### Burst 9 - Connection Stability
+- Scope: stale connection detection in runner, ping/pong loops for OKX/Bybit, frame handler error isolation, HL mux L2 wiring.
+- Outcome: reconnects triggered on stale sockets; OKX/Bybit WS clients now emit keepalive pings; corrupt frame errors no longer kill sockets; HL mux L2 included for regression coverage.
+- Uncertainty eliminated: resilience of WS ingestion under stale or malformed frames.
+
+### Burst 10 - Error Handling & State Persistence
+- Scope: standardized CLI error output, paper state recovery tests.
+- Outcome: exec CLI uses shared error helper for consistent exit handling; corrupt state recovery covered by tests.
+- Uncertainty eliminated: error message consistency and paper state recovery behavior.
+
+### Burst 11 - Testing (Unit/Integration/Load)
+- Scope: unit tests for rate limiter/paper state, mux integration test, load test loop, coverage collection.
+- Outcome: expanded test suite and coverage artifacts captured for core paths.
+- Uncertainty eliminated: basic regression coverage for refactored modules and mux behavior.
+
+### Burst 12 - Testing (Edge/Testnet)
+- Scope: edge case tests for malformed JSON, WebSocket stale simulation, testnet setup documentation.
+- Outcome: edge cases covered in tests; testnet prerequisites documented in OPERATIONS.md.
+- Uncertainty eliminated: expected behavior under malformed frames and clarity on testnet setup requirements.
+
+### Completion Summary
+- Version bumped to 0.9.0.
+- ARCHITECTURE.md and OPERATIONS.md added.
+- Tests, coverage, and regression commands executed (paper mode; testnet setup documented).

@@ -1,7 +1,5 @@
 using System.Collections.Concurrent;
 using System.Linq;
-using System.Text.Json;
-
 namespace Xws.Exec;
 
 public sealed class PaperExecutionClient : IExecutionClient
@@ -11,6 +9,7 @@ public sealed class PaperExecutionClient : IExecutionClient
     private long _orderSequence;
     private long _clientOrderSequence;
     private readonly ConcurrentDictionary<string, PaperOrder> _orders = new();
+    private readonly ConcurrentDictionary<string, string> _ordersByClientId = new();
     private readonly ConcurrentDictionary<string, PositionState> _positions = new();
     private const decimal DefaultFillPrice = 100m;
 
@@ -62,6 +61,7 @@ public sealed class PaperExecutionClient : IExecutionClient
                 OrderStatus.Filled,
                 updatedAt);
             _orders[orderId] = filledOrder;
+            _ordersByClientId[clientOrderId] = orderId;
             PersistState();
 
             return Task.FromResult(new PlaceOrderResult(
@@ -84,6 +84,7 @@ public sealed class PaperExecutionClient : IExecutionClient
             updatedAt);
 
         _orders[orderId] = order;
+        _ordersByClientId[clientOrderId] = orderId;
         PersistState();
         return Task.FromResult(new PlaceOrderResult(
             OrderStatus.Open,
@@ -111,24 +112,22 @@ public sealed class PaperExecutionClient : IExecutionClient
                 _mode));
         }
 
-        if (!string.IsNullOrWhiteSpace(request.ClientOrderId))
+        if (!string.IsNullOrWhiteSpace(request.ClientOrderId)
+            && _ordersByClientId.TryGetValue(request.ClientOrderId, out var mappedOrderId)
+            && _orders.TryGetValue(mappedOrderId, out var mappedOrder)
+            && mappedOrder.Status == OrderStatus.Open)
         {
-            var match = _orders.Values.FirstOrDefault(o => o.ClientOrderId == request.ClientOrderId
-                && o.Status == OrderStatus.Open);
-            if (match is not null)
+            _orders[mappedOrder.OrderId] = mappedOrder with
             {
-                _orders[match.OrderId] = match with
-                {
-                    Status = OrderStatus.Cancelled,
-                    UpdatedAt = DateTimeOffset.UtcNow
-                };
-                PersistState();
-                return Task.FromResult(new CancelOrderResult(
-                    true,
-                    match.OrderId,
-                    match.ClientOrderId,
-                    _mode));
-            }
+                Status = OrderStatus.Cancelled,
+                UpdatedAt = DateTimeOffset.UtcNow
+            };
+            PersistState();
+            return Task.FromResult(new CancelOrderResult(
+                true,
+                mappedOrder.OrderId,
+                mappedOrder.ClientOrderId,
+                _mode));
         }
 
         return Task.FromResult(new CancelOrderResult(
@@ -307,6 +306,12 @@ public sealed class PaperExecutionClient : IExecutionClient
 
         if (!string.IsNullOrWhiteSpace(request.ClientOrderId))
         {
+            if (_ordersByClientId.TryGetValue(request.ClientOrderId, out var mappedOrderId)
+                && _orders.TryGetValue(mappedOrderId, out var mappedOrder))
+            {
+                return mappedOrder;
+            }
+
             return _orders.Values.FirstOrDefault(o => o.ClientOrderId == request.ClientOrderId);
         }
 
@@ -315,23 +320,14 @@ public sealed class PaperExecutionClient : IExecutionClient
 
     private void LoadState(string path)
     {
-        if (!File.Exists(path))
-        {
-            return;
-        }
-
-        var json = File.ReadAllText(path);
-        var state = JsonSerializer.Deserialize<PaperState>(json);
-        if (state is null)
-        {
-            throw new InvalidOperationException("paper state file is invalid");
-        }
+        var state = PaperStateStore.LoadOrEmpty(path, message => Console.Error.WriteLine($"warning: {message}"));
 
         _orderSequence = state.OrderSequence;
         _clientOrderSequence = state.ClientOrderSequence;
         foreach (var order in state.Orders)
         {
             _orders[order.OrderId] = order;
+            _ordersByClientId[order.ClientOrderId] = order.OrderId;
         }
 
         foreach (var position in state.Positions)
@@ -347,37 +343,13 @@ public sealed class PaperExecutionClient : IExecutionClient
             return;
         }
 
-        var directory = Path.GetDirectoryName(_statePath);
-        if (!string.IsNullOrWhiteSpace(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        var state = new PaperState(
+        var state = new PaperStateSnapshot(
+            PaperStateStore.CurrentVersion,
             _orderSequence,
             _clientOrderSequence,
             _orders.Values.OrderBy(o => o.OrderId).ToList(),
             _positions.Values.OrderBy(p => p.Symbol).ToList());
 
-        var json = JsonSerializer.Serialize(state);
-        File.WriteAllText(_statePath, json);
+        PaperStateStore.Save(_statePath, state);
     }
-
-    private sealed record PaperOrder(
-        string OrderId,
-        string ClientOrderId,
-        string Symbol,
-        OrderSide Side,
-        OrderType Type,
-        decimal Size,
-        decimal? Price,
-        decimal FilledSize,
-        OrderStatus Status,
-        DateTimeOffset UpdatedAt);
-
-    private sealed record PaperState(
-        long OrderSequence,
-        long ClientOrderSequence,
-        List<PaperOrder> Orders,
-        List<PositionState> Positions);
 }
