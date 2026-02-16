@@ -1,11 +1,12 @@
 using System.Buffers;
 using System.Net.WebSockets;
 using System.Text;
-using xws.Core.Output;
-using xws.Core.Shared.Logging;
-using xws.Core.Subscriptions;
+using Xws.Abstractions;
+using Xws.Data.Output;
+using Xws.Data.Shared.Logging;
+using Xws.Data.Subscriptions;
 
-namespace xws.Core.WebSocket;
+namespace Xws.Data.WebSocket;
 
 public sealed class WebSocketRunner
 {

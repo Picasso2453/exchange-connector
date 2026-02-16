@@ -1,0 +1,1 @@
+{"type":"xws.envelope.v1","exchange":"hl","market":null,"stream":"markprice","symbols":["SOL"],"receivedAt":"2026-02-14T00:00:00Z","raw":{"type":"activeAssetCtx","coin":"SOL","markPrice":102.25},"rawEncoding":"json"}

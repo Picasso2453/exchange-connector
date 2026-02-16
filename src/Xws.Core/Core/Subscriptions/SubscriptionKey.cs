@@ -1,3 +1,3 @@
-namespace xws.Core.Subscriptions;
+namespace Xws.Data.Subscriptions;
 
 public sealed record SubscriptionKey(string Type, string Parameters);

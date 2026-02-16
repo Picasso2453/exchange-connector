@@ -1,9 +1,10 @@
 using System.Text.Json;
 using System.Threading.Channels;
-using xws.Core.Output;
-using xws.Core.Shared.Logging;
+using Xws.Abstractions;
+using Xws.Data.Output;
+using Xws.Data.Shared.Logging;
 
-namespace xws.Core.Mux;
+namespace Xws.Data.Mux;
 
 public sealed class MuxRunner
 {

@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace xws.Core.Dev;
+namespace Xws.Data.Dev;
 
 public static class DevEmitter
 {

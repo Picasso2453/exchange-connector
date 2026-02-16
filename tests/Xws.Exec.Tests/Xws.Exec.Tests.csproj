@@ -19,7 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Xws.Abstractions\Xws.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Xws.Exec\Xws.Exec.csproj" />
+    <ProjectReference Include="..\..\src\Xws.Exchanges\Xws.Exchanges.csproj" />
+    <ProjectReference Include="..\..\src\xws.exec.cli\xws.exec.cli.csproj" />
   </ItemGroup>
 
 </Project>

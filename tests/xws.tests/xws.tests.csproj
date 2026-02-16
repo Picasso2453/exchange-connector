@@ -21,7 +21,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Xws.Core\Xws.Core.csproj" />
+    <ProjectReference Include="..\..\src\Xws.Abstractions\Xws.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Xws.Core\Xws.Data.csproj" />
+    <ProjectReference Include="..\..\src\Xws.Exchanges\Xws.Exchanges.csproj" />
     <ProjectReference Include="..\..\src\xws\xws.csproj" />
   </ItemGroup>
 

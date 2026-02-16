@@ -1,4 +1,4 @@
-using xws.Core.Shared.Logging;
+using Xws.Data.Shared.Logging;
 
 namespace xws.tests;
 

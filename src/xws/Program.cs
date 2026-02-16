@@ -2,7 +2,7 @@ using System.CommandLine;
 
 using xws.Commands;
 using xws.Config;
-using xws.Core.Shared.Logging;
+using Xws.Data.Shared.Logging;
 
 Logger.Configure(Console.Error.WriteLine, Console.Error.WriteLine);
 

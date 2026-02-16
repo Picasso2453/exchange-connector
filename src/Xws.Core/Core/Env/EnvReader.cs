@@ -1,4 +1,4 @@
-namespace xws.Core.Env;
+namespace Xws.Data.Env;
 
 public static class EnvReader
 {

@@ -1,9 +1,9 @@
 using System.CommandLine;
 
-using xws.Core.Output;
-using xws.Core.Runner;
-using xws.Core.Shared.Logging;
-using xws.Exchanges.Mexc;
+using Xws.Data.Output;
+using xws.Runner;
+using Xws.Data.Shared.Logging;
+using Xws.Exchanges.Mexc;
 
 namespace xws.Commands;
 

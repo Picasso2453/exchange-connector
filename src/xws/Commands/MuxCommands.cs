@@ -1,8 +1,8 @@
 using System.CommandLine;
 
-using xws.Core.Mux;
-using xws.Core.Runner;
-using xws.Core.Shared.Logging;
+using Xws.Data.Mux;
+using xws.Runner;
+using Xws.Data.Shared.Logging;
 
 namespace xws.Commands;
 

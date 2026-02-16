@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
-using xws.Core.Output;
+using Xws.Data.Output;
 
 namespace xws.tests;
 

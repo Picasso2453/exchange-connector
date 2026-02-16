@@ -1,6 +1,6 @@
 using System.Threading.Channels;
 
-namespace xws.Core.Output;
+namespace Xws.Data.Output;
 
 public sealed class OutputChannel
 {

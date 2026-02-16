@@ -1,9 +1,6 @@
-namespace xws.Core.Output;
+using Xws.Abstractions;
 
-public interface IJsonlWriter
-{
-    void WriteLine(string message);
-}
+namespace Xws.Data.Output;
 
 public sealed class JsonlWriter : IJsonlWriter
 {

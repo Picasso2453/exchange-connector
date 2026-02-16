@@ -1,4 +1,4 @@
-namespace xws.Core.Mux;
+namespace Xws.Data.Mux;
 
 public sealed class MuxRunnerOptions
 {

@@ -8,10 +8,10 @@ deterministic CLI behavior.
 
 ## Architecture / Modules
 
-- `Xws.Core`: receiver runtime (adapters, mux runner, JSONL formatting).
+- `Xws.Data`: receiver runtime (adapters, mux runner, JSONL formatting).
 - `xws`: receiver CLI (market data only).
 - `Xws.Exec`: execution library (no console IO).
-- `xws.exec.cli`: thin execution CLI (Windows-safe name to avoid case collisions).
+- `Xws (unified CLI)`: thin execution CLI (Windows-safe name to avoid case collisions).
 
 ## Goals
 
@@ -23,13 +23,13 @@ deterministic CLI behavior.
 ## Non-Goals
 
 - Normalized cross-exchange schemas.
-- Trading actions inside the receiver (`xws`) or `Xws.Core`.
+- Trading actions inside the receiver (`xws`) or `Xws.Data`.
 - Local persistence or stateful order management.
 
 ## Execution
 
 `Xws.Exec` is a library-first execution module (separate from the receiver).
-`xws.exec.cli` is a thin wrapper that emits JSONL to stdout.
+`Xws (unified CLI)` is a thin wrapper that emits JSONL to stdout.
 
 Modes:
 
@@ -46,23 +46,23 @@ Safety gates (mainnet only):
 Examples (paper mode):
 
 ```
-dotnet run --project src/xws.exec.cli -- place --mode paper --exchange hl --symbol HYPE --side buy --type market --size 1
-dotnet run --project src/xws.exec.cli -- place --mode paper --exchange hl --symbol HYPE --side buy --type limit --size 1 --price 1.23
-dotnet run --project src/xws.exec.cli -- amend --mode paper --exchange hl --order-id 000001 --price 1.25
-dotnet run --project src/xws.exec.cli -- query orders --mode paper --exchange hl --status open
-dotnet run --project src/xws.exec.cli -- query positions --mode paper --exchange hl
-dotnet run --project src/xws.exec.cli -- cancel --mode paper --exchange hl --order-id 000001
-dotnet run --project src/xws.exec.cli -- cancel-all --mode paper --exchange hl
+dotnet run --project src/Xws (unified CLI) -- place --mode paper --exchange hl --symbol HYPE --side buy --type market --size 1
+dotnet run --project src/Xws (unified CLI) -- place --mode paper --exchange hl --symbol HYPE --side buy --type limit --size 1 --price 1.23
+dotnet run --project src/Xws (unified CLI) -- amend --mode paper --exchange hl --order-id 000001 --price 1.25
+dotnet run --project src/Xws (unified CLI) -- query orders --mode paper --exchange hl --status open
+dotnet run --project src/Xws (unified CLI) -- query positions --mode paper --exchange hl
+dotnet run --project src/Xws (unified CLI) -- cancel --mode paper --exchange hl --order-id 000001
+dotnet run --project src/Xws (unified CLI) -- cancel-all --mode paper --exchange hl
 ```
 
-Note: `xws.exec.cli` persists paper state to `artifacts/paper/state.json` so sequential commands can share state. Delete the file to reset the paper session.
+Note: `Xws (unified CLI)` persists paper state to `artifacts/paper/state.json` so sequential commands can share state. Delete the file to reset the paper session.
 
 ## Quick Start: Paper Demo
 
 Run the scripted demo:
 
 ```
-./scripts/demo-paper.sh
+./tools/scripts/demo-paper.sh
 ```
 
 PowerShell (Windows):
@@ -75,22 +75,22 @@ Manual demo flow (Hyperliquid):
 
 ```
 dotnet run --project src/xws -- subscribe trades --sub hl=SOL --max-messages 5 --timeout-seconds 20
-dotnet run --project src/xws.exec.cli -- place --mode paper --exchange hl --symbol SOL --side buy --type limit --size 1 --price 100 --client-order-id demo-hl-001
-dotnet run --project src/xws.exec.cli -- query orders --mode paper --exchange hl --status open
-dotnet run --project src/xws.exec.cli -- amend --mode paper --exchange hl --order-id 000001 --price 101
-dotnet run --project src/xws.exec.cli -- cancel --mode paper --exchange hl --order-id 000001
+dotnet run --project src/Xws (unified CLI) -- place --mode paper --exchange hl --symbol SOL --side buy --type limit --size 1 --price 100 --client-order-id demo-hl-001
+dotnet run --project src/Xws (unified CLI) -- query orders --mode paper --exchange hl --status open
+dotnet run --project src/Xws (unified CLI) -- amend --mode paper --exchange hl --order-id 000001 --price 101
+dotnet run --project src/Xws (unified CLI) -- cancel --mode paper --exchange hl --order-id 000001
 ```
 
 OKX paper order example (symbol format: `BTC-USDT-SWAP`):
 
 ```
-dotnet run --project src/xws.exec.cli -- place --mode paper --exchange okx --symbol BTC-USDT-SWAP --side buy --type limit --size 0.01 --price 50000 --client-order-id demo-okx-001
+dotnet run --project src/Xws (unified CLI) -- place --mode paper --exchange okx --symbol BTC-USDT-SWAP --side buy --type limit --size 0.01 --price 50000 --client-order-id demo-okx-001
 ```
 
 Bybit paper order example (symbol format: `BTCUSDT`):
 
 ```
-dotnet run --project src/xws.exec.cli -- place --mode paper --exchange bybit --symbol BTCUSDT --side buy --type limit --size 0.01 --price 50000 --client-order-id demo-bybit-001
+dotnet run --project src/Xws (unified CLI) -- place --mode paper --exchange bybit --symbol BTCUSDT --side buy --type limit --size 0.01 --price 50000 --client-order-id demo-bybit-001
 ```
 
 Expected output (JSONL):
@@ -116,13 +116,13 @@ dotnet run --project src/xws -- hl subscribe candle --symbol SOL --interval 1m -
 Send a market buy:
 
 ```
-dotnet run --project src/xws.exec.cli -- place --mode paper --exchange hl --symbol SOL --side buy --type market --size 1 --client-order-id buy-001
+dotnet run --project src/Xws (unified CLI) -- place --mode paper --exchange hl --symbol SOL --side buy --type market --size 1 --client-order-id buy-001
 ```
 
 Close a trade (reduce-only market sell):
 
 ```
-dotnet run --project src/xws.exec.cli -- place --mode paper --exchange hl --symbol SOL --side sell --type market --size 1 --reduce-only --client-order-id close-001
+dotnet run --project src/Xws (unified CLI) -- place --mode paper --exchange hl --symbol SOL --side sell --type market --size 1 --reduce-only --client-order-id close-001
 ```
 
 ## Commands
@@ -303,15 +303,15 @@ dotnet run --project src/xws -- subscribe fills `
 Mux output defaults to an envelope JSONL format. Legacy HL commands support
 `--format raw` to preserve the M1 raw frame contract.
 
-## Library usage (Xws.Core)
+## Library usage (Xws.Data)
 
-Xws.Core is the reusable runtime: adapters, mux runner, and JSONL formatting.
+Xws.Data is the reusable runtime: adapters, mux runner, and JSONL formatting.
 You can reference it via project reference (today) or NuGet (once published).
 
 Project reference:
 
 ```
-dotnet add <your-project> reference src/Xws.Core/Xws.Core.csproj
+dotnet add <your-project> reference src/Xws.Data/Xws.Data.csproj
 ```
 
 ## CLI usage
@@ -346,7 +346,7 @@ dotnet run --project src/xws -- dev emit --count 5 --timeout-seconds 5
 
 Execution credentials:
 
-- `xws.exec.cli` does not define env var names for Hyperliquid credentials yet.
+- `Xws (unified CLI)` does not define env var names for Hyperliquid credentials yet.
   Hosts can pass credentials directly to `Xws.Exec` via `ExecutionConfig`.
 
 ## Connectivity Note (MEXC)
@@ -413,12 +413,12 @@ Validated by CI on Windows and Ubuntu. The CLI should also run on Linux without 
 
 Local packaging outputs go to `artifacts/` (ignored by git).
 
-Pack Xws.Core to NuGet:
+Pack Xws.Data to NuGet:
 
 ```
-scripts/pack.ps1
+tools/scripts/pack.ps1
 # or
-./scripts/pack.sh
+./tools/scripts/pack.sh
 ```
 
 Note: on Windows, the `.sh` scripts require WSL. Use the `.ps1` scripts if WSL
@@ -426,14 +426,14 @@ is not installed.
 
 Outputs:
 
-- `artifacts/nuget/` for `Xws.Core.*.nupkg`
+- `artifacts/nuget/` for `Xws.Data.*.nupkg`
 
 Publish CLI:
 
 ```
-scripts/publish.ps1
+tools/scripts/publish.ps1
 # or
-./scripts/publish.sh
+./tools/scripts/publish.sh
 ```
 
 Outputs:
@@ -455,4 +455,4 @@ allow-fail smoke job exists for live checks.
 ## ExecGuard DLL Demo UI
 - Standalone Python demo UI showing an ExecGuard DLL usage pattern.
 - Requires `pythonnet` and built DLLs (`dotnet build -c Release`).
-- See `dll_demo/README.md` and run `python demo_ui.py` from `dll_demo/`.
+- See `tools/demo/README.md` and run `python demo_ui.py` from `tools/demo/`.

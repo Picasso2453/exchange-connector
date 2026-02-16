@@ -2,8 +2,8 @@
 
 ## Overview
 `xws` is a .NET 8 CLI and library set for exchange WebSocket market data ingestion and (paper/testnet/mainnet) execution workflows. The system is library-first:
-- `Xws.Core` provides exchange adapters, muxing, envelope serialization, and WebSocket runners.
-- `xws` is a thin CLI that wires commands to `Xws.Core`.
+- `Xws.Data` provides exchange adapters, muxing, envelope serialization, and WebSocket runners.
+- `xws` is a thin CLI that wires commands to `Xws.Data`.
 - `Xws.Exec` provides execution abstractions and paper-state handling.
 - `xws.exec.cli` is a thin CLI over `Xws.Exec`.
 
@@ -15,7 +15,7 @@ flowchart LR
     XWS_EXEC[xws.exec.cli]
   end
   subgraph Core
-    CORE[Xws.Core]
+    CORE[Xws.Data]
     MUX[MuxRunner]
     WS[WebSocketRunner]
   end
@@ -60,8 +60,8 @@ stateDiagram-v2
 ```
 
 ## Repository Structure (Key Paths)
-- `src/Xws.Core/Exchanges/{HL,OKX,Bybit,MEXC}/WebSocket/`
-- `src/Xws.Core/Shared/Interfaces/`
+- `src/Xws.Data/Exchanges/{HL,OKX,Bybit,MEXC}/WebSocket/`
+- `src/Xws.Data/Shared/Interfaces/`
 - `src/Xws.Exec/Exchanges/{HL,OKX,Bybit}/`
 - `src/Xws.Exec/Shared/State/`
 - `src/xws/Commands/`

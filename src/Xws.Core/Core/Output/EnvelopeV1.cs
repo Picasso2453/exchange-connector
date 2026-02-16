@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace xws.Core.Output;
+namespace Xws.Data.Output;
 
 public sealed record EnvelopeV1(
     [property: JsonPropertyName("type")] string Type,

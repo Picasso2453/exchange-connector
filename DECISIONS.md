@@ -86,3 +86,15 @@
 ## Milestone 10 (2026-02-16)
 
 - Assumption: error message format enforcement applies to user-facing CLI errors in `xws` and `xws.exec.cli`, not internal library exceptions.
+
+## 2026-02-16: Xws.Exchanges Package References
+Assumption: skipped explicit System.Text.Json PackageReference in Xws.Exchanges because .NET 8 includes it and no existing version is defined in the repo. Will add a package reference later if build requires it.
+
+## 2026-02-16: Exchange Namespace Casing
+Assumption: preserved existing `xws.Exchanges.*` namespace casing for moved adapters to avoid API changes; no `Xws.Exchanges.*` rename performed at this stage.
+
+## 2026-02-16: Xws.Exchanges Temporary Core Reference
+Assumption: added ProjectReference to `Xws.Core` in `Xws.Exchanges` so adapters compile until `Xws.Core` is renamed and dependencies are resolved.
+
+## 2026-02-16: Wiki Submodule Path
+Assumption: add the wiki as a git submodule at `wiki/` using `https://github.com/Picasso2453/exchange-connector.wiki.git`.

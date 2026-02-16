@@ -1,13 +1,13 @@
 using System.CommandLine;
 
-using xws.Core.Env;
-using xws.Core.Output;
-using xws.Core.Runner;
-using xws.Core.Shared.Logging;
-using xws.Core.Subscriptions;
-using xws.Core.WebSocket;
-using xws.Exchanges.Hyperliquid;
-using xws.Exchanges.Hyperliquid.Rest;
+using Xws.Data.Env;
+using Xws.Data.Output;
+using xws.Runner;
+using Xws.Data.Shared.Logging;
+using Xws.Data.Subscriptions;
+using Xws.Data.WebSocket;
+using Xws.Exchanges.Hyperliquid;
+using Xws.Exchanges.Hyperliquid.Rest;
 
 namespace xws.Commands;
 

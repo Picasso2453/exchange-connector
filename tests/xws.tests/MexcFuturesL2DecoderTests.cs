@@ -1,4 +1,4 @@
-using xws.Exchanges.Mexc;
+using Xws.Exchanges.Mexc;
 using xws.tests.Fixtures;
 
 namespace xws.tests;

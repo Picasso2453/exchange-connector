@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 
-namespace xws.Core.Subscriptions;
+namespace Xws.Data.Subscriptions;
 
 public sealed class SubscriptionRegistry
 {

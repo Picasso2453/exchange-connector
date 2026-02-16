@@ -2,9 +2,9 @@ using System.Net;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
-using xws.Core.Output;
-using xws.Core.Subscriptions;
-using xws.Core.WebSocket;
+using Xws.Data.Output;
+using Xws.Data.Subscriptions;
+using Xws.Data.WebSocket;
 
 namespace xws.tests;
 

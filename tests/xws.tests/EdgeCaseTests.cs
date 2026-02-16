@@ -1,5 +1,5 @@
-using xws.Exchanges.Mexc.WebSocket;
-using xws.Exchanges.Okx.WebSocket;
+using Xws.Exchanges.Mexc.WebSocket;
+using Xws.Exchanges.Okx.WebSocket;
 
 namespace xws.tests;
 

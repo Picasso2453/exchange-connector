@@ -12,7 +12,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Xws.Core\Xws.Core.csproj" />
+    <ProjectReference Include="..\Xws.Abstractions\Xws.Abstractions.csproj" />
+    <ProjectReference Include="..\Xws.Core\Xws.Data.csproj" />
+    <ProjectReference Include="..\Xws.Exchanges\Xws.Exchanges.csproj" />
   </ItemGroup>
 
 </Project>

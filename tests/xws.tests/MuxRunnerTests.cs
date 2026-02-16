@@ -1,6 +1,6 @@
 using System.Threading.Channels;
-using xws.Core.Mux;
-using xws.Core.Output;
+using Xws.Data.Mux;
+using Xws.Data.Output;
 
 namespace xws.tests;
 

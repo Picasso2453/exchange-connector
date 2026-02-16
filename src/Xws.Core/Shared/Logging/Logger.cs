@@ -1,4 +1,4 @@
-namespace xws.Core.Shared.Logging;
+namespace Xws.Data.Shared.Logging;
 
 public static class Logger
 {

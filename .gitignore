@@ -482,4 +482,11 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
-project-notes/
+
+# Python virtual environments
+.venv/
+.venv*/
+venv/
+
+# Archived milestone notes
+.archive/

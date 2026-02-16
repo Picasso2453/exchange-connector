@@ -1,4 +1,4 @@
-namespace xws.Core.WebSocket;
+namespace Xws.Data.WebSocket;
 
 public sealed class WebSocketRunnerOptions
 {

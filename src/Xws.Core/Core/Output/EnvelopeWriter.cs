@@ -1,6 +1,7 @@
 using System.Text.Json;
+using Xws.Abstractions;
 
-namespace xws.Core.Output;
+namespace Xws.Data.Output;
 
 public sealed class EnvelopeWriter : IJsonlWriter
 {
