@@ -1,33 +1,51 @@
 # Architecture
 
 ## Overview
-`xws` is a .NET 8 CLI and library set for exchange WebSocket market data ingestion and (paper/testnet/mainnet) execution workflows. The system is library-first:
-- `Xws.Data` provides exchange adapters, muxing, envelope serialization, and WebSocket runners.
-- `xws` is a thin CLI that wires commands to `Xws.Data`.
-- `Xws.Exec` provides execution abstractions and paper-state handling.
-- `xws.exec.cli` is a thin CLI over `Xws.Exec`.
+`xws` is a .NET 8 CLI and library set for exchange WebSocket market data ingestion and (paper/testnet/mainnet) execution workflows. The system is library-first with clean separation of concerns:
+
+- `Xws.Abstractions`: Shared interfaces and contracts (IExchangeAdapter, IWebSocketClient, IMessageParser, IJsonlWriter).
+- `Xws.Data`: Market data runtime (mux runner, WebSocket clients, JSONL formatting).
+- `Xws.Exchanges`: Exchange adapter implementations (Hyperliquid, OKX, Bybit, MEXC).
+- `xws`: Thin CLI for market data subscriptions.
+- `Xws.Exec`: Execution library (paper/testnet/mainnet order management).
+- `xws.exec.cli`: Thin CLI for execution commands.
 
 ## Module Diagram
 ```mermaid
-flowchart LR
-  subgraph CLI
+flowchart TB
+  subgraph CLI["CLI Layer"]
     XWS[xws CLI]
     XWS_EXEC[xws.exec.cli]
   end
-  subgraph Core
-    CORE[Xws.Data]
+
+  subgraph Data["Market Data Layer"]
+    EXCHANGES[Xws.Exchanges]
+    DATA[Xws.Data]
     MUX[MuxRunner]
     WS[WebSocketRunner]
   end
-  subgraph Exec
+
+  subgraph Exec["Execution Layer"]
     EXEC[Xws.Exec]
     STATE[PaperStateStore]
   end
-  XWS --> CORE
+
+  subgraph Abstractions["Abstractions Layer"]
+    IFACE[Xws.Abstractions]
+  end
+
+  XWS --> DATA
+  XWS --> EXCHANGES
   XWS_EXEC --> EXEC
-  CORE --> MUX
-  CORE --> WS
+
+  EXCHANGES --> DATA
+  EXCHANGES --> IFACE
+  DATA --> IFACE
+  DATA --> MUX
+  DATA --> WS
+
   EXEC --> STATE
+  EXEC --> IFACE
 ```
 
 ## Data Flow
@@ -59,10 +77,49 @@ stateDiagram-v2
   Open --> Rejected: reject
 ```
 
+## Dependency Graph
+
+**No Circular Dependencies** (resolved in M11 via Xws.Abstractions)
+
+```
+Xws.Exchanges → Xws.Data → Xws.Abstractions
+                ↓
+             xws CLI
+
+Xws.Exec → Xws.Abstractions
+    ↓
+xws.exec.cli
+```
+
 ## Repository Structure (Key Paths)
-- `src/Xws.Data/Exchanges/{HL,OKX,Bybit,MEXC}/WebSocket/`
-- `src/Xws.Data/Shared/Interfaces/`
-- `src/Xws.Exec/Exchanges/{HL,OKX,Bybit}/`
-- `src/Xws.Exec/Shared/State/`
-- `src/xws/Commands/`
-- `src/xws.exec.cli/Commands/`
+
+### Abstractions
+- `src/Xws.Abstractions/IExchangeAdapter.cs`
+- `src/Xws.Abstractions/IWebSocketClient.cs`
+- `src/Xws.Abstractions/IMessageParser.cs`
+- `src/Xws.Abstractions/IJsonlWriter.cs`
+
+### Market Data
+- `src/Xws.Data/Core/Mux/` - Multi-exchange muxing logic
+- `src/Xws.Data/Core/Output/` - JSONL formatting
+- `src/Xws.Data/Core/WebSocket/` - Generic WebSocket client
+
+### Exchange Adapters
+- `src/Xws.Exchanges/Hyperliquid/` - Hyperliquid adapter (WebSocket, REST, parsing)
+- `src/Xws.Exchanges/Okx/` - OKX adapter
+- `src/Xws.Exchanges/Bybit/` - Bybit adapter
+- `src/Xws.Exchanges/Mexc/` - MEXC adapter (includes Protobuf definitions)
+
+### Execution
+- `src/Xws.Exec/Exchanges/{HL,OKX,Bybit}/` - Exchange-specific execution clients
+- `src/Xws.Exec/Shared/State/` - Paper trading state management
+- `src/Xws.Exec/Shared/Models/` - Order, position, and execution models
+
+### CLI
+- `src/xws/Commands/` - Market data CLI commands
+- `src/xws.exec.cli/Commands/` - Execution CLI commands
+
+### Tests
+- `tests/Xws.Data.Tests/` - Market data runtime tests
+- `tests/Xws.Exchanges.Tests/` - Exchange adapter tests
+- `tests/Xws.Exec.Tests/` - Execution logic tests
