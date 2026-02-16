@@ -2,6 +2,7 @@ using xws.Config;
 
 namespace xws.tests;
 
+[Collection("EnvironmentVariables")]
 public sealed class DotEnvLoaderTests
 {
     [Fact]

@@ -1,4 +1,5 @@
 using System.CommandLine;
+
 using xws.Core.Dev;
 using xws.Core.Output;
 using xws.Core.Shared.Logging;
@@ -25,7 +26,14 @@ public static class DevCommands
             {
                 if (count <= 0)
                 {
-                    Logger.Error("--count must be greater than 0");
+                    Logger.Error("Invalid --count. Value must be greater than 0. Provide a positive integer.");
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
+                if (timeoutSeconds.HasValue && timeoutSeconds.Value <= 0)
+                {
+                    Logger.Error("Invalid --timeout-seconds. Value must be greater than 0. Provide a positive integer.");
                     Environment.ExitCode = 1;
                     return;
                 }
@@ -46,7 +54,7 @@ public static class DevCommands
                 }
                 catch (OperationCanceledException)
                 {
-                    Logger.Error("dev emit timeout reached");
+                    Logger.Error("Dev emit timed out. The timeout expired before all lines were emitted. Increase --timeout-seconds or reduce --count.");
                     Environment.ExitCode = 1;
                 }
                 finally
@@ -57,7 +65,7 @@ public static class DevCommands
             }
             catch (Exception ex)
             {
-                Logger.Error($"dev emit failed: {ex.Message}");
+                Logger.Error($"Dev emit failed. {ex.Message}. Retry or check input parameters.");
                 Environment.ExitCode = 2;
             }
         }, devCountOption, devTimeoutSecondsOption);

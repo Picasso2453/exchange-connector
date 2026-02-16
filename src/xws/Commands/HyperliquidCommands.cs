@@ -1,4 +1,5 @@
 using System.CommandLine;
+
 using xws.Core.Env;
 using xws.Core.Output;
 using xws.Core.Runner;
@@ -70,14 +71,14 @@ public static class HyperliquidCommands
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"hl symbols failed: {ex.Message}");
+                    Logger.Error($"HL symbols failed. {ex.Message}. Retry or check connectivity.");
                     Environment.ExitCode = 2;
                     ok = false;
                 }
             }
             catch (Exception ex)
             {
-                Logger.Error($"hl symbols failed: {ex.Message}");
+                Logger.Error($"HL symbols failed. {ex.Message}. Retry or check connectivity.");
                 Environment.ExitCode = 2;
             }
 
@@ -169,6 +170,13 @@ public static class HyperliquidCommands
                     return;
                 }
 
+                if (!SymbolValidation.IsValidSymbol("hl", null, symbol, out var symbolError))
+                {
+                    Logger.Error($"Invalid --symbol. {symbolError}. Provide an exchange-native symbol.");
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
                 var runner = new XwsRunner();
                 var writerTask = CommandHelpers.WriteOutputAsync(runner.Output.Reader, cts.Token);
                 try
@@ -184,7 +192,7 @@ public static class HyperliquidCommands
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"hl subscribe {name} failed: {ex.Message}");
+                    Logger.Error($"HL subscribe {name} failed. {ex.Message}. Check connectivity and retry.");
                     Environment.ExitCode = 2;
                 }
                 finally
@@ -194,7 +202,7 @@ public static class HyperliquidCommands
             }
             catch (Exception ex)
             {
-                Logger.Error($"hl subscribe {name} failed: {ex.Message}");
+                Logger.Error($"HL subscribe {name} failed. {ex.Message}. Check connectivity and retry.");
                 Environment.ExitCode = 2;
             }
         }, tradesSymbolOption, maxMessagesOption, timeoutSecondsOption, formatOption);
@@ -233,6 +241,13 @@ public static class HyperliquidCommands
                     return;
                 }
 
+                if (!SymbolValidation.IsValidSymbol("hl", null, symbol, out var symbolError))
+                {
+                    Logger.Error($"Invalid --symbol. {symbolError}. Provide an exchange-native symbol.");
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
                 var runner = new XwsRunner();
                 var writerTask = CommandHelpers.WriteOutputAsync(runner.Output.Reader, cts.Token);
                 try
@@ -248,7 +263,7 @@ public static class HyperliquidCommands
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"hl subscribe candle failed: {ex.Message}");
+                    Logger.Error($"HL subscribe candle failed. {ex.Message}. Check connectivity and retry.");
                     Environment.ExitCode = 2;
                 }
                 finally
@@ -258,7 +273,7 @@ public static class HyperliquidCommands
             }
             catch (Exception ex)
             {
-                Logger.Error($"hl subscribe candle failed: {ex.Message}");
+                Logger.Error($"HL subscribe candle failed. {ex.Message}. Check connectivity and retry.");
                 Environment.ExitCode = 2;
             }
         }, tradesSymbolOption, candleIntervalOption, maxMessagesOption, timeoutSecondsOption, formatOption);
@@ -296,7 +311,7 @@ public static class HyperliquidCommands
                 var user = EnvReader.GetOptional("XWS_HL_USER");
                 if (string.IsNullOrWhiteSpace(user))
                 {
-                    Logger.Error("missing required env var: XWS_HL_USER");
+                    Logger.Error("Missing required env var: XWS_HL_USER. Positions stream requires a wallet address. Set XWS_HL_USER in .env or environment.");
                     Environment.ExitCode = 1;
                     return;
                 }
@@ -316,7 +331,7 @@ public static class HyperliquidCommands
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"hl subscribe positions failed: {ex.Message}");
+                    Logger.Error($"HL subscribe positions failed. {ex.Message}. Check connectivity and retry.");
                     Environment.ExitCode = 2;
                 }
                 finally
@@ -326,7 +341,7 @@ public static class HyperliquidCommands
             }
             catch (Exception ex)
             {
-                Logger.Error($"hl subscribe positions failed: {ex.Message}");
+                Logger.Error($"HL subscribe positions failed. {ex.Message}. Check connectivity and retry.");
                 Environment.ExitCode = 2;
             }
         }, maxMessagesOption, timeoutSecondsOption, formatOption);

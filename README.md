@@ -361,9 +361,11 @@ and at least one envelope line was emitted.
 - Dotenv load errors: `--dotenv <path>` requires the file to exist. Use `--no-dotenv` to disable loading or ensure the file is present. Default `.env` is optional.
 - Exit codes: `0` success, `1` user/input/config error, `2` system/runtime error (unexpected failure).
 - Common CLI errors:
-  - `--timeout-seconds requires --max-messages`: set both to enforce deterministic stop.
-  - `missing required env var: XWS_HL_USER`: required for `hl subscribe positions`, `subscribe liquidations`, and `subscribe fills`.
-  - `mux only supports --format envelope`: mux does not support raw output.
+  - `Invalid --timeout-seconds...`: timeout requires `--max-messages`. Provide both values or remove `--timeout-seconds`.
+  - `Missing required env var: XWS_HL_USER...`: required for `hl subscribe positions`, `subscribe liquidations`, and `subscribe fills`.
+  - `Unsupported --format for mux...`: mux does not support raw output.
+  - `Invalid --exchange...`: supported values are `hl`, `okx`, `bybit`, `mexc`.
+  - `Invalid --symbol...`: use exchange-native symbols (examples above).
   - `mux completed without output` or `mux timeout reached`: no envelopes were emitted; exit code will be `1`.
 
 ## Configuration
@@ -449,3 +451,8 @@ allow-fail smoke job exists for live checks.
 - Raw JSONL streaming CLI with Hyperliquid adapter.
 - Reconnect/backoff with retry cap = 3 and resubscribe.
 - Discovery via `hl symbols`.
+
+## ExecGuard DLL Demo UI
+- Standalone Python demo UI showing an ExecGuard DLL usage pattern.
+- Requires `pythonnet` and built DLLs (`dotnet build -c Release`).
+- See `dll_demo/README.md` and run `python demo_ui.py` from `dll_demo/`.

@@ -1,4 +1,5 @@
 using System.CommandLine;
+
 using xws.Commands;
 using xws.Config;
 using xws.Core.Shared.Logging;
@@ -54,6 +55,6 @@ try
 }
 catch (Exception ex)
 {
-    Logger.Error($"fatal: {ex.Message}");
+    Logger.Error($"Fatal error. Unhandled exception occurred. {ex.Message}. Re-run with --help or file an issue.");
     return 2;
 }

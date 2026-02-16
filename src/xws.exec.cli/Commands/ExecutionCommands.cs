@@ -1,4 +1,5 @@
 using System.CommandLine;
+
 using Xws.Exec;
 
 namespace Xws.Exec.Cli;
@@ -66,13 +67,13 @@ public static class ExecutionCommands
 
                 if (!ExecutionCommandHelpers.TryParseMode(mode, out var execMode))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --mode (expected: paper|testnet|mainnet)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --mode. Supported values are paper, testnet, mainnet. Use --mode paper|testnet|mainnet.", 1);
                     return;
                 }
 
                 if (!ExecutionCommandHelpers.TryParseExchange(exchange, out var execExchange))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --exchange (expected: hl|okx|bybit|mexc)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --exchange. Supported values are hl, okx, bybit, mexc. Use --exchange hl|okx|bybit|mexc.", 1);
                     return;
                 }
 
@@ -86,25 +87,31 @@ public static class ExecutionCommands
 
                 if (!ExecutionCommandHelpers.TryParseSide(side, out var orderSide))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --side (expected: buy|sell)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --side. Supported values are buy or sell. Use --side buy|sell.", 1);
                     return;
                 }
 
                 if (!ExecutionCommandHelpers.TryParseType(type, out var orderType))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --type (expected: market|limit)", 1);
-                    return;
-                }
-
-                if (orderType == OrderType.Limit && price is null)
-                {
-                    ExecutionCommandHelpers.Fail("--price is required for limit orders", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --type. Supported values are market or limit. Use --type market|limit.", 1);
                     return;
                 }
 
                 if (execMode != ExecutionMode.Paper)
                 {
-                    ExecutionCommandHelpers.Fail("only paper mode is implemented in the CLI", 1);
+                    ExecutionCommandHelpers.Fail("Unsupported --mode in CLI. xws.exec.cli only supports paper mode. Use --mode paper or use Xws.Exec for testnet/mainnet.", 1);
+                    return;
+                }
+
+                if (!ExecutionCommandHelpers.IsValidSymbol(execExchange, symbol, out var symbolError))
+                {
+                    ExecutionCommandHelpers.Fail($"Invalid --symbol. {symbolError}. Provide exchange-native symbols.", 1);
+                    return;
+                }
+
+                if (!ExecutionCommandHelpers.ValidatePlaceInputs(orderType, size, price, out var inputError))
+                {
+                    ExecutionCommandHelpers.Fail(inputError, 1);
                     return;
                 }
 
@@ -131,8 +138,7 @@ public static class ExecutionCommands
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"place failed: {ex.Message}");
-                Environment.ExitCode = 2;
+                ExecutionCommandHelpers.Fail($"Place failed. {ex.Message}. Check input values and retry.", 2);
             }
         });
 
@@ -163,13 +169,19 @@ public static class ExecutionCommands
 
                 if (!ExecutionCommandHelpers.TryParseMode(mode, out var execMode))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --mode (expected: paper|testnet|mainnet)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --mode. Supported values are paper, testnet, mainnet. Use --mode paper|testnet|mainnet.", 1);
                     return;
                 }
 
                 if (!ExecutionCommandHelpers.TryParseExchange(exchange, out var execExchange))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --exchange (expected: hl|okx|bybit|mexc)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --exchange. Supported values are hl, okx, bybit, mexc. Use --exchange hl|okx|bybit|mexc.", 1);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(orderId))
+                {
+                    ExecutionCommandHelpers.Fail("Invalid --order-id. Value is required. Provide a non-empty order id.", 1);
                     return;
                 }
 
@@ -183,7 +195,7 @@ public static class ExecutionCommands
 
                 if (execMode != ExecutionMode.Paper)
                 {
-                    ExecutionCommandHelpers.Fail("only paper mode is implemented in the CLI", 1);
+                    ExecutionCommandHelpers.Fail("Unsupported --mode in CLI. xws.exec.cli only supports paper mode. Use --mode paper or use Xws.Exec for testnet/mainnet.", 1);
                     return;
                 }
 
@@ -194,8 +206,7 @@ public static class ExecutionCommands
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"cancel failed: {ex.Message}");
-                Environment.ExitCode = 2;
+                ExecutionCommandHelpers.Fail($"Cancel failed. {ex.Message}. Check the order id and retry.", 2);
             }
         });
 
@@ -226,13 +237,13 @@ public static class ExecutionCommands
 
                 if (!ExecutionCommandHelpers.TryParseMode(mode, out var execMode))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --mode (expected: paper|testnet|mainnet)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --mode. Supported values are paper, testnet, mainnet. Use --mode paper|testnet|mainnet.", 1);
                     return;
                 }
 
                 if (!ExecutionCommandHelpers.TryParseExchange(exchange, out var execExchange))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --exchange (expected: hl|okx|bybit|mexc)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --exchange. Supported values are hl, okx, bybit, mexc. Use --exchange hl|okx|bybit|mexc.", 1);
                     return;
                 }
 
@@ -246,7 +257,13 @@ public static class ExecutionCommands
 
                 if (execMode != ExecutionMode.Paper)
                 {
-                    ExecutionCommandHelpers.Fail("only paper mode is implemented in the CLI", 1);
+                    ExecutionCommandHelpers.Fail("Unsupported --mode in CLI. xws.exec.cli only supports paper mode. Use --mode paper or use Xws.Exec for testnet/mainnet.", 1);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(symbol) && !ExecutionCommandHelpers.IsValidSymbol(execExchange, symbol, out var symbolError))
+                {
+                    ExecutionCommandHelpers.Fail($"Invalid --symbol. {symbolError}. Provide exchange-native symbols.", 1);
                     return;
                 }
 
@@ -257,8 +274,7 @@ public static class ExecutionCommands
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"cancel-all failed: {ex.Message}");
-                Environment.ExitCode = 2;
+                ExecutionCommandHelpers.Fail($"Cancel-all failed. {ex.Message}. Check inputs and retry.", 2);
             }
         });
 
@@ -298,13 +314,19 @@ public static class ExecutionCommands
 
                 if (!ExecutionCommandHelpers.TryParseMode(mode, out var execMode))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --mode (expected: paper|testnet|mainnet)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --mode. Supported values are paper, testnet, mainnet. Use --mode paper|testnet|mainnet.", 1);
                     return;
                 }
 
                 if (!ExecutionCommandHelpers.TryParseExchange(exchange, out var execExchange))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --exchange (expected: hl|okx|bybit|mexc)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --exchange. Supported values are hl, okx, bybit, mexc. Use --exchange hl|okx|bybit|mexc.", 1);
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(orderId))
+                {
+                    ExecutionCommandHelpers.Fail("Invalid --order-id. Value is required. Provide a non-empty order id.", 1);
                     return;
                 }
 
@@ -318,13 +340,13 @@ public static class ExecutionCommands
 
                 if (execMode != ExecutionMode.Paper)
                 {
-                    ExecutionCommandHelpers.Fail("only paper mode is implemented in the CLI", 1);
+                    ExecutionCommandHelpers.Fail("Unsupported --mode in CLI. xws.exec.cli only supports paper mode. Use --mode paper or use Xws.Exec for testnet/mainnet.", 1);
                     return;
                 }
 
-                if (price is null && size is null)
+                if (!ExecutionCommandHelpers.ValidateAmendInputs(size, price, out var amendError))
                 {
-                    ExecutionCommandHelpers.Fail("amend requires --price, --size, or both", 1);
+                    ExecutionCommandHelpers.Fail(amendError, 1);
                     return;
                 }
 
@@ -341,8 +363,7 @@ public static class ExecutionCommands
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"amend failed: {ex.Message}");
-                Environment.ExitCode = 2;
+                ExecutionCommandHelpers.Fail($"Amend failed. {ex.Message}. Check inputs and retry.", 2);
             }
         });
 
@@ -381,19 +402,25 @@ public static class ExecutionCommands
 
                 if (!ExecutionCommandHelpers.TryParseMode(mode, out var execMode))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --mode (expected: paper|testnet|mainnet)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --mode. Supported values are paper, testnet, mainnet. Use --mode paper|testnet|mainnet.", 1);
                     return;
                 }
 
                 if (!ExecutionCommandHelpers.TryParseExchange(exchange, out var execExchange))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --exchange (expected: hl|okx|bybit|mexc)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --exchange. Supported values are hl, okx, bybit, mexc. Use --exchange hl|okx|bybit|mexc.", 1);
                     return;
                 }
 
                 if (!ExecutionCommandHelpers.TryParseOrderStatus(status, out var queryStatus))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --status (expected: open|closed|all)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --status. Supported values are open, closed, all. Use --status open|closed|all.", 1);
+                    return;
+                }
+
+                if (orderId is not null && string.IsNullOrWhiteSpace(orderId))
+                {
+                    ExecutionCommandHelpers.Fail("Invalid --order-id. Value cannot be empty when provided. Remove --order-id or provide a value.", 1);
                     return;
                 }
 
@@ -407,7 +434,13 @@ public static class ExecutionCommands
 
                 if (execMode != ExecutionMode.Paper)
                 {
-                    ExecutionCommandHelpers.Fail("only paper mode is implemented in the CLI", 1);
+                    ExecutionCommandHelpers.Fail("Unsupported --mode in CLI. xws.exec.cli only supports paper mode. Use --mode paper or use Xws.Exec for testnet/mainnet.", 1);
+                    return;
+                }
+
+                if (!string.IsNullOrWhiteSpace(symbol) && !ExecutionCommandHelpers.IsValidSymbol(execExchange, symbol, out var querySymbolError))
+                {
+                    ExecutionCommandHelpers.Fail($"Invalid --symbol. {querySymbolError}. Provide exchange-native symbols.", 1);
                     return;
                 }
 
@@ -419,8 +452,7 @@ public static class ExecutionCommands
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"query orders failed: {ex.Message}");
-                Environment.ExitCode = 2;
+                ExecutionCommandHelpers.Fail($"Query orders failed. {ex.Message}. Check inputs and retry.", 2);
             }
         });
 
@@ -438,13 +470,13 @@ public static class ExecutionCommands
 
                 if (!ExecutionCommandHelpers.TryParseMode(mode, out var execMode))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --mode (expected: paper|testnet|mainnet)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --mode. Supported values are paper, testnet, mainnet. Use --mode paper|testnet|mainnet.", 1);
                     return;
                 }
 
                 if (!ExecutionCommandHelpers.TryParseExchange(exchange, out var execExchange))
                 {
-                    ExecutionCommandHelpers.Fail("invalid --exchange (expected: hl|okx|bybit|mexc)", 1);
+                    ExecutionCommandHelpers.Fail("Invalid --exchange. Supported values are hl, okx, bybit, mexc. Use --exchange hl|okx|bybit|mexc.", 1);
                     return;
                 }
 
@@ -458,7 +490,7 @@ public static class ExecutionCommands
 
                 if (execMode != ExecutionMode.Paper)
                 {
-                    ExecutionCommandHelpers.Fail("only paper mode is implemented in the CLI", 1);
+                    ExecutionCommandHelpers.Fail("Unsupported --mode in CLI. xws.exec.cli only supports paper mode. Use --mode paper or use Xws.Exec for testnet/mainnet.", 1);
                     return;
                 }
 
@@ -469,8 +501,7 @@ public static class ExecutionCommands
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"query positions failed: {ex.Message}");
-                Environment.ExitCode = 2;
+                ExecutionCommandHelpers.Fail($"Query positions failed. {ex.Message}. Check inputs and retry.", 2);
             }
         });
 

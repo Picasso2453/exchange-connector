@@ -6,13 +6,13 @@ public static class DotEnvLoader
     {
         if (string.IsNullOrWhiteSpace(path))
         {
-            return new DotEnvLoadResult(false, "dotenv path is required");
+            return new DotEnvLoadResult(false, "Dotenv path is required. --dotenv was provided without a path. Provide --dotenv <path> or omit the flag.");
         }
 
         if (!File.Exists(path))
         {
             return required
-                ? new DotEnvLoadResult(false, $"dotenv file not found: {path}")
+                ? new DotEnvLoadResult(false, $"Dotenv file not found. The path does not exist: {path}. Check the path or omit --dotenv.")
                 : new DotEnvLoadResult(false, null);
         }
 

@@ -1,4 +1,5 @@
 using System.CommandLine;
+
 using Xws.Exec.Cli;
 
 var root = new RootCommand("xws.exec CLI");
@@ -11,6 +12,6 @@ try
 }
 catch (Exception ex)
 {
-    Console.Error.WriteLine($"fatal: {ex.Message}");
+    ExecutionCommandHelpers.Fail($"Fatal error. Unhandled exception occurred. {ex.Message}. Re-run with --help or file an issue.", 2);
     return 2;
 }

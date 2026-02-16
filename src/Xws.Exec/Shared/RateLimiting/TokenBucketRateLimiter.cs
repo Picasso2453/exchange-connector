@@ -1,5 +1,8 @@
 namespace Xws.Exec;
 
+/// <summary>
+/// Token-bucket rate limiter.
+/// </summary>
 public sealed class TokenBucketRateLimiter : IRateLimiter
 {
     private readonly int _capacity;
@@ -8,6 +11,11 @@ public sealed class TokenBucketRateLimiter : IRateLimiter
     private DateTimeOffset _lastRefill;
     private readonly SemaphoreSlim _gate = new(1, 1);
 
+    /// <summary>
+    /// Creates a token bucket limiter.
+    /// </summary>
+    /// <param name="capacity">Maximum token capacity.</param>
+    /// <param name="refillPerSecond">Tokens added per second.</param>
     public TokenBucketRateLimiter(int capacity, int refillPerSecond)
     {
         _capacity = Math.Max(1, capacity);
@@ -16,6 +24,7 @@ public sealed class TokenBucketRateLimiter : IRateLimiter
         _lastRefill = DateTimeOffset.UtcNow;
     }
 
+    /// <inheritdoc />
     public async Task WaitAsync(CancellationToken cancellationToken)
     {
         while (true)
@@ -48,7 +57,7 @@ public sealed class TokenBucketRateLimiter : IRateLimiter
 
             if (shouldDelay)
             {
-                Console.Error.WriteLine("rate limit: throttling request");
+                Console.Error.WriteLine("Warning: rate limit throttling request. Request rate exceeded configured limit. Reduce rate or increase limits.");
                 await Task.Delay(delay, cancellationToken);
             }
         }

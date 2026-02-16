@@ -67,3 +67,22 @@
 - Assumption: OKX/Bybit ping payload uses plain `ping`/`pong` text frames; added periodic ping and pong ignore in WS clients.
 - Assumption: `dotnet-counters` not available in environment; memory profiling performed via short-run process sampling instead of counters.
 - Assumption: testnet validation skipped due to missing credentials; documented setup steps in OPERATIONS.md.
+
+## Milestone 10 (2026-02-15)
+
+- Assumption: treat any `XWS_*` environment variable containing `KEY`, `SECRET`, `PASS`, `TOKEN`, `PRIVATE`, `USER`, or `ADDR` as sensitive and redact its value from logs/errors.
+- Assumption: `dotnet-trace` not available in environment; profiling performed via Stopwatch-based throughput tests and BenchmarkDotNet results instead.
+- Optimization: added `SymbolArrayCache` to reuse single-symbol arrays in hot MEXC decoders to reduce allocations per message.
+- Optimization: removed LINQ-heavy query paths in `PaperExecutionClient` to reduce allocations in paper execution queries.
+
+## Milestone 10 (2026-02-15)
+
+- Assumption: mock ExecGuard DLL interface is implemented in pure Python to avoid real DLL dependencies for the demo UI.
+- Assumption: tkinter is used for the demo UI to avoid external dependencies.
+- Assumption: demo UI uses pythonnet to load Xws.Core/Xws.Exec .NET assemblies directly.
+- Assumption: Hyperliquid live credentials are provided via XWS_HL_USER and XWS_HL_PRIVATE_KEY; execution mode via XWS_EXEC_MODE (paper/testnet/mainnet).
+- Assumption: symbol discovery is implemented for Hyperliquid only; other exchanges return an empty symbol list in the demo.
+
+## Milestone 10 (2026-02-16)
+
+- Assumption: error message format enforcement applies to user-facing CLI errors in `xws` and `xws.exec.cli`, not internal library exceptions.

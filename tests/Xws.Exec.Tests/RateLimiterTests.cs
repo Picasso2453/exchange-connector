@@ -2,6 +2,7 @@ using Xunit;
 
 namespace Xws.Exec.Tests;
 
+[Collection("EnvironmentVariables")]
 public sealed class RateLimiterTests
 {
     [Fact]

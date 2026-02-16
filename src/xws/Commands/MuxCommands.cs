@@ -1,4 +1,5 @@
 using System.CommandLine;
+
 using xws.Core.Mux;
 using xws.Core.Runner;
 using xws.Core.Shared.Logging;
@@ -105,7 +106,7 @@ public static class MuxCommands
 
                 if (format.Equals("raw", StringComparison.OrdinalIgnoreCase))
                 {
-                    Logger.Error("mux only supports --format envelope");
+                    Logger.Error("Unsupported --format for mux. Mux outputs envelope JSONL only. Remove --format or set --format envelope.");
                     Environment.ExitCode = 1;
                     return;
                 }
@@ -119,9 +120,9 @@ public static class MuxCommands
                 var parsed = new List<ParsedSub>();
                 foreach (var sub in subs)
                 {
-                    if (!CommandHelpers.TryParseSub(sub, out var parsedSub))
+                    if (!CommandHelpers.TryParseSub(sub, out var parsedSub, out var parseError))
                     {
-                        Logger.Error($"invalid --sub format: {sub}");
+                        Logger.Error($"Invalid --sub. {parseError}. Example: hl=SOL or okx.fut=BTC-USDT-SWAP.");
                         Environment.ExitCode = 1;
                         return;
                     }
@@ -145,7 +146,7 @@ public static class MuxCommands
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"mux subscribe {name} failed: {ex.Message}");
+                    Logger.Error($"Mux subscribe {name} failed. {ex.Message}. Check connectivity and retry.");
                     Environment.ExitCode = 2;
                 }
                 finally
@@ -155,7 +156,7 @@ public static class MuxCommands
             }
             catch (Exception ex)
             {
-                Logger.Error($"mux subscribe {name} failed: {ex.Message}");
+                Logger.Error($"Mux subscribe {name} failed. {ex.Message}. Check connectivity and retry.");
                 Environment.ExitCode = 2;
             }
         }, muxSubOption, muxMaxMessagesOption, muxTimeoutSecondsOption, muxFormatOption);

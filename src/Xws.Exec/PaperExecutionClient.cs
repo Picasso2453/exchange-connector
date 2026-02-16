@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
-using System.Linq;
 namespace Xws.Exec;
 
+/// <summary>
+/// In-memory paper execution client with optional state persistence.
+/// </summary>
 public sealed class PaperExecutionClient : IExecutionClient
 {
     private readonly ExecutionMode _mode;
@@ -13,11 +15,19 @@ public sealed class PaperExecutionClient : IExecutionClient
     private readonly ConcurrentDictionary<string, PositionState> _positions = new();
     private const decimal DefaultFillPrice = 100m;
 
+    /// <summary>
+    /// Creates a paper execution client in paper mode.
+    /// </summary>
     public PaperExecutionClient()
         : this(ExecutionMode.Paper)
     {
     }
 
+    /// <summary>
+    /// Creates a paper execution client for the specified mode and optional state path.
+    /// </summary>
+    /// <param name="mode">Execution mode (paper/testnet/mainnet).</param>
+    /// <param name="statePath">Optional path for persisting paper state.</param>
     public PaperExecutionClient(ExecutionMode mode, string? statePath = null)
     {
         _mode = mode;
@@ -28,6 +38,12 @@ public sealed class PaperExecutionClient : IExecutionClient
         }
     }
 
+    /// <summary>
+    /// Places a paper order and updates local state.
+    /// </summary>
+    /// <param name="request">Order request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Placement result.</returns>
     public Task<PlaceOrderResult> PlaceAsync(PlaceOrderRequest request, CancellationToken cancellationToken)
     {
         if (request.Size <= 0)
@@ -93,6 +109,12 @@ public sealed class PaperExecutionClient : IExecutionClient
             _mode));
     }
 
+    /// <summary>
+    /// Cancels a paper order and updates local state.
+    /// </summary>
+    /// <param name="request">Cancel request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Cancel result.</returns>
     public Task<CancelOrderResult> CancelAsync(CancelOrderRequest request, CancellationToken cancellationToken)
     {
         if (!string.IsNullOrWhiteSpace(request.OrderId)
@@ -138,11 +160,22 @@ public sealed class PaperExecutionClient : IExecutionClient
             "order not found"));
     }
 
+    /// <summary>
+    /// Cancels all open paper orders.
+    /// </summary>
+    /// <param name="request">Cancel-all request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Cancel-all result.</returns>
     public Task<CancelAllResult> CancelAllAsync(CancelAllRequest request, CancellationToken cancellationToken)
     {
         var count = 0;
-        foreach (var order in _orders.Values.Where(o => o.Status == OrderStatus.Open))
+        foreach (var order in _orders.Values)
         {
+            if (order.Status != OrderStatus.Open)
+            {
+                continue;
+            }
+
             _orders[order.OrderId] = order with
             {
                 Status = OrderStatus.Cancelled,
@@ -162,6 +195,12 @@ public sealed class PaperExecutionClient : IExecutionClient
             _mode));
     }
 
+    /// <summary>
+    /// Amends a paper order and updates local state.
+    /// </summary>
+    /// <param name="request">Amend request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Amend result.</returns>
     public Task<AmendOrderResult> AmendAsync(AmendOrderRequest request, CancellationToken cancellationToken)
     {
         var match = ResolveOrder(request);
@@ -201,50 +240,65 @@ public sealed class PaperExecutionClient : IExecutionClient
             _mode));
     }
 
+    /// <summary>
+    /// Queries paper orders using filters.
+    /// </summary>
+    /// <param name="request">Query request.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Query result.</returns>
     public Task<QueryOrdersResult> QueryOrdersAsync(QueryOrdersRequest request, CancellationToken cancellationToken)
     {
-        IEnumerable<PaperOrder> orders = _orders.Values;
-
-        if (!string.IsNullOrWhiteSpace(request.OrderId))
+        var results = new List<OrderState>();
+        foreach (var order in _orders.Values)
         {
-            orders = orders.Where(o => o.OrderId == request.OrderId);
+            if (!string.IsNullOrWhiteSpace(request.OrderId)
+                && !string.Equals(order.OrderId, request.OrderId, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Symbol)
+                && !string.Equals(order.Symbol, request.Symbol, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (request.Status == OrderQueryStatus.Open && order.Status != OrderStatus.Open)
+            {
+                continue;
+            }
+
+            if (request.Status == OrderQueryStatus.Closed && order.Status == OrderStatus.Open)
+            {
+                continue;
+            }
+
+            results.Add(new OrderState(
+                order.OrderId,
+                order.ClientOrderId,
+                order.Symbol,
+                order.Side,
+                order.Type,
+                order.Size,
+                order.Price,
+                order.FilledSize,
+                order.Status,
+                order.UpdatedAt));
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Symbol))
-        {
-            orders = orders.Where(o => string.Equals(o.Symbol, request.Symbol, StringComparison.OrdinalIgnoreCase));
-        }
-
-        orders = request.Status switch
-        {
-            OrderQueryStatus.Open => orders.Where(o => o.Status == OrderStatus.Open),
-            OrderQueryStatus.Closed => orders.Where(o => o.Status != OrderStatus.Open),
-            _ => orders
-        };
-
-        var results = orders
-            .OrderBy(o => o.OrderId)
-            .Select(o => new OrderState(
-                o.OrderId,
-                o.ClientOrderId,
-                o.Symbol,
-                o.Side,
-                o.Type,
-                o.Size,
-                o.Price,
-                o.FilledSize,
-                o.Status,
-                o.UpdatedAt))
-            .ToList();
-
+        results.Sort(static (a, b) => string.CompareOrdinal(a.OrderId, b.OrderId));
         return Task.FromResult(new QueryOrdersResult(_mode, results));
     }
 
+    /// <summary>
+    /// Queries current paper positions.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Positions result.</returns>
     public Task<QueryPositionsResult> QueryPositionsAsync(CancellationToken cancellationToken)
     {
-        var positions = _positions.Values
-            .OrderBy(p => p.Symbol)
-            .ToList();
+        var positions = _positions.Values.ToList();
+        positions.Sort(static (a, b) => string.CompareOrdinal(a.Symbol, b.Symbol));
         return Task.FromResult(new QueryPositionsResult(_mode, positions));
     }
 
@@ -312,7 +366,13 @@ public sealed class PaperExecutionClient : IExecutionClient
                 return mappedOrder;
             }
 
-            return _orders.Values.FirstOrDefault(o => o.ClientOrderId == request.ClientOrderId);
+            foreach (var candidate in _orders.Values)
+            {
+                if (string.Equals(candidate.ClientOrderId, request.ClientOrderId, StringComparison.Ordinal))
+                {
+                    return candidate;
+                }
+            }
         }
 
         return null;
@@ -320,7 +380,7 @@ public sealed class PaperExecutionClient : IExecutionClient
 
     private void LoadState(string path)
     {
-        var state = PaperStateStore.LoadOrEmpty(path, message => Console.Error.WriteLine($"warning: {message}"));
+        var state = PaperStateStore.LoadOrEmpty(path, message => Console.Error.WriteLine($"Warning: {message}"));
 
         _orderSequence = state.OrderSequence;
         _clientOrderSequence = state.ClientOrderSequence;

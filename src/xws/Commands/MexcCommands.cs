@@ -1,4 +1,5 @@
 using System.CommandLine;
+
 using xws.Core.Output;
 using xws.Core.Runner;
 using xws.Core.Shared.Logging;
@@ -43,14 +44,21 @@ public static class MexcCommands
 
                 if (symbols.Length == 0)
                 {
-                    Logger.Error("--symbol requires at least one value");
+                    Logger.Error("Invalid --symbol. At least one symbol is required. Provide a comma-separated list.");
                     Environment.ExitCode = 1;
                     return;
                 }
 
                 if (symbols.Length > 30)
                 {
-                    Logger.Error("mexc spot supports max 30 subscriptions per connection");
+                    Logger.Error("Too many symbols. MEXC spot supports max 30 subscriptions per connection. Reduce --symbol values or use multiple runs.");
+                    Environment.ExitCode = 1;
+                    return;
+                }
+
+                if (!SymbolValidation.ValidateSymbols("mexc", "spot", symbols, out var symbolError))
+                {
+                    Logger.Error($"Invalid --symbol. {symbolError}. Provide exchange-native symbols.");
                     Environment.ExitCode = 1;
                     return;
                 }
@@ -68,7 +76,7 @@ public static class MexcCommands
                 }
                 catch (Exception ex)
                 {
-                    Logger.Error($"mexc spot subscribe trades failed: {ex.Message}");
+                    Logger.Error($"MEXC spot subscribe trades failed. {ex.Message}. Check connectivity and retry.");
                     Environment.ExitCode = 2;
                 }
                 finally
@@ -78,7 +86,7 @@ public static class MexcCommands
             }
             catch (Exception ex)
             {
-                Logger.Error($"mexc spot subscribe trades failed: {ex.Message}");
+                Logger.Error($"MEXC spot subscribe trades failed. {ex.Message}. Check connectivity and retry.");
                 Environment.ExitCode = 2;
             }
         }, mexcSymbolOption, muxMaxMessagesOption, muxTimeoutSecondsOption);
