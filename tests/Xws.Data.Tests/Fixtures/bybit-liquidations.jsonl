@@ -1,1 +1,0 @@
-{"type":"xws.envelope.v1","exchange":"bybit","market":"fut","stream":"liquidations","symbols":["BTCUSDT"],"receivedAt":"2026-02-14T00:00:00.0000000Z","raw":{"topic":"liquidation.BTCUSDT","data":{"side":"Sell","qty":"0.1","price":"50000","ts":"1700000000000"}},"rawEncoding":"json"}

@@ -1,1 +1,0 @@
-{"type":"xws.envelope.v1","exchange":"hl","market":null,"stream":"liquidations","symbols":["SOL"],"receivedAt":"2026-02-14T00:00:00Z","raw":{"type":"userEvents","event":"liquidation","coin":"SOL","side":"sell","size":12.5},"rawEncoding":"json"}

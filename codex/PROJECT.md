@@ -1,28 +1,81 @@
-# PROJECT
+# PROJECT.md
 
-## Intent
-Restructure the repository into clear layers: market data (`Xws.Data`), execution (`Xws.Exec`), shared exchange adapters (`Xws.Exchanges`), and a unified CLI (`Xws`).
+## Overview
 
-## Scope (Milestone 11)
-- Create `Xws.Exchanges` project and move exchange adapters from `Xws.Data`.
-- Rename `Xws.Data` to `Xws.Data` (market data layer).
-- Merge `xws` and `xws.exec.cli` into a single `Xws` CLI project.
-- Keep `Xws.Exec` as-is (execution layer), update references.
-- Move `dll_demo/` to `tools/demo/`, `scripts/` to `tools/scripts/`.
-- Move `project-notes/` to `.archive/milestone-notes/`.
-- Remove `.venv312/`, keep `.venv/` and update `.gitignore`.
-- Rename tests: `xws.tests` -> `Xws.Data.Tests`; create `Xws.Exchanges.Tests` for exchange fixtures.
-- Update solution file, namespaces, and project references.
+**Connector** is a .NET 8 library + CLI for exchange WebSocket/REST connectivity. It provides:
 
-## Constraints
-- .NET 8 target and existing 4-project architecture.
-- No new features or dependency updates.
-- No internal logic changes; refactor only.
-- Preserve NuGet APIs (rename only, no breaking behavior).
-- Python demo must still run after path changes.
+- Unified typed contracts for market data (WS) and execution (REST)
+- Transport layer with reconnect/backoff, rate limiting, auth hooks
+- Translator/Adapter pattern for adding exchanges
+- Long-lived daemon that emits JSONL events to stdout, logs to stderr
+- Per-subscription ordering guarantees
 
-## Milestones
-- Milestone 11: Repository restructure and validation.
+## Architecture
 
-## Status
-- Started: 2026-02-16
+```
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│ CLI (thin)   │────▶│ Managers      │────▶│ Transports       │
+│ stdout=JSONL │     │ WS / REST     │     │ WS / REST        │
+│ stderr=logs  │     └──────┬───────┘     └─────────┬───────┘
+└─────────────┘            │                        │
+                    ┌──────▼───────┐         ┌──────▼───────┐
+                    │ Translators   │         │ Exchange WS   │
+                    │ (per exchange)│         │ / HTTP APIs   │
+                    └──────────────┘         └──────────────┘
+```
+
+### Layers
+
+- **Contracts**: Unified enums, request/response/event models for WS and REST
+- **Abstractions**: Interfaces for adapters, translators, transports, auth, rate limiting
+- **Transports**: WebSocket (reconnect, backoff) and REST (HttpClient) implementations
+- **Managers**: WebSocketManager (subscribe, fanout, ordering) and RestManager (execute)
+- **Exchanges**: Per-exchange adapter + translator implementations
+- **CLI**: Thin orchestration (parse args → create managers → stream events)
+
+### Key Decisions
+
+- Single WS connection per exchange instance
+- Per-subscription ordering via Channel<T>
+- stdout = JSONL events only; stderr = structured logs
+- No external services required for tests (mock/fake transports)
+
+## Supported Exchanges
+
+- [x] Hyperliquid (Milestone 1) — trades, l2Book, candles, orderUpdates, userFills
+- [ ] Bybit (Milestone 2)
+- [ ] MEXC (Milestone 3)
+
+## Unified Contracts
+
+### WS Events (8 types)
+- TradesEvent, OrderBookL1Event, OrderBookL2Event, CandleEvent
+- UserOrderEvent, FillEvent, PositionEvent, BalanceEvent
+
+### REST Operations (7 types)
+- PlaceOrder, CancelOrder, GetBalances, GetPositions, GetOpenOrders, GetFills, GetCandles
+
+### Serialization
+- camelCase property names, enums as strings
+- Optional RawPayload escape hatch (--raw flag)
+
+## CLI Usage
+
+```bash
+# Stream BTC trades from Hyperliquid
+connector --exchange hl --symbols BTC --channels trades --no-auth
+
+# Stream multiple symbols/channels
+connector --exchange hl --symbols BTC,ETH,SOL --channels trades,l2,candles --no-auth
+
+# Include raw exchange payloads
+connector --exchange hl --symbols BTC --channels trades --no-auth --raw
+```
+
+## Test Suite
+41 tests across 5 test files:
+- ContractSerializationTests (17) — roundtrip for all contract types
+- ManagerLifecycleTests (3) — start/stop/subscribe lifecycle
+- TransportTests (4) — rate limiter and model validation
+- HyperliquidWsTranslatorTests (14) — golden JSON fixtures
+- SoakTests (3) — pipeline stress tests with fake transport

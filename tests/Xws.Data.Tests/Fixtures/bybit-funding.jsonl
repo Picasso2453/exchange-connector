@@ -1,1 +1,0 @@
-{"type":"xws.envelope.v1","exchange":"bybit","market":"fut","stream":"funding","symbols":["BTCUSDT"],"receivedAt":"2026-02-14T00:00:00.0000000Z","raw":{"topic":"fundingRate.BTCUSDT","data":{"fundingRate":"0.0001","nextFundingTime":"1700000000000"}},"rawEncoding":"json"}

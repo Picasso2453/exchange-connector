@@ -1,1 +1,0 @@
-{"type":"xws.envelope.v1","exchange":"okx","market":"fut","stream":"liquidations","symbols":["BTC-USDT-SWAP"],"receivedAt":"2026-02-14T00:00:00.0000000Z","raw":{"arg":{"channel":"liquidation-orders","instId":"BTC-USDT-SWAP"},"data":[{"instId":"BTC-USDT-SWAP","bkPx":"50000","posSide":"long","side":"sell","ts":"1700000000000"}]},"rawEncoding":"json"}

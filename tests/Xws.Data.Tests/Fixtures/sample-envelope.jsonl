@@ -1,1 +1,0 @@
-{"type":"xws.envelope.v1","exchange":"mexc","market":"fut","stream":"trades","symbols":["BTCUSDT"],"receivedAt":"2026-01-30T00:00:00.0000000Z","raw":{"channel":"fixture"},"rawEncoding":"json"}
