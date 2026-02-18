@@ -159,7 +159,7 @@ static ConnectorConfig? ParseArgs(string[] args)
     {
         if (!TryParseChannel(ch, out var wsChannel))
         {
-            Console.Error.WriteLine($"Error: Unknown channel '{ch}'. Supported: trades, l2, candles, userOrders, fills");
+            Console.Error.WriteLine($"Error: Unknown channel '{ch}'. Supported: trades, l1, l2, candles, allmids, assetctx, orders, fills, positions, balances, fundings, ledger, notifications, openorders, twapstate, twapfills, twaphistory, assetdata, webdata");
             return null;
         }
         parsedChannels.Add(wsChannel);
@@ -193,13 +193,24 @@ static bool TryParseChannel(string name, out UnifiedWsChannel result)
     result = name.ToLowerInvariant() switch
     {
         "trades" => UnifiedWsChannel.Trades,
-        "l1" or "orderbookl1" => UnifiedWsChannel.OrderBookL1,
+        "l1" or "bbo" or "orderbookl1" => UnifiedWsChannel.OrderBookL1,
         "l2" or "orderbookl2" => UnifiedWsChannel.OrderBookL2,
         "candles" => UnifiedWsChannel.Candles,
-        "userorders" or "orders" => UnifiedWsChannel.UserOrders,
-        "fills" => UnifiedWsChannel.Fills,
-        "positions" => UnifiedWsChannel.Positions,
+        "allmids" or "mids" => UnifiedWsChannel.AllMids,
+        "assetctx" or "activeassetctx" => UnifiedWsChannel.ActiveAssetCtx,
+        "userorders" or "orders" or "orderupdates" => UnifiedWsChannel.UserOrders,
+        "fills" or "userfills" => UnifiedWsChannel.Fills,
+        "positions" or "clearinghouse" => UnifiedWsChannel.Positions,
         "balances" => UnifiedWsChannel.Balances,
+        "fundings" or "userfundings" => UnifiedWsChannel.UserFundings,
+        "ledger" or "nonfunding" => UnifiedWsChannel.Ledger,
+        "notifications" => UnifiedWsChannel.Notifications,
+        "openorders" => UnifiedWsChannel.OpenOrders,
+        "twapstate" or "twapstates" => UnifiedWsChannel.TwapState,
+        "twapfills" or "twapslicefills" => UnifiedWsChannel.TwapSliceFills,
+        "twaphistory" => UnifiedWsChannel.TwapHistory,
+        "assetdata" or "activeassetdata" => UnifiedWsChannel.ActiveAssetData,
+        "webdata" or "webdata3" => UnifiedWsChannel.WebData,
         _ => (UnifiedWsChannel)(-1)
     };
     return (int)result >= 0;
@@ -217,15 +228,24 @@ static void PrintHelp(string version)
         Options:
           --exchange <name>    Exchange to connect to (hyperliquid, bybit, mexc)
           --symbols <list>     Comma-separated symbol list (e.g. BTC,ETH,SOL)
-          --channels <list>    Comma-separated channels (trades,l2,candles,userOrders,fills)
+          --channels <list>    Comma-separated channels (see below)
           --config <path>      Path to JSON config file (optional)
           --no-auth            Run without authentication (public data only)
           --raw                Include raw exchange payloads in events
           --help, -h           Show this help
           --version, -v        Show version
 
+        Channels (public):
+          trades, l1/bbo, l2, candles, allmids, assetctx
+
+        Channels (private, requires user address):
+          orders, fills, positions, balances, fundings, ledger,
+          notifications, openorders, twapstate, twapfills, twaphistory,
+          assetdata, webdata
+
         Examples:
-          connector --exchange hyperliquid --symbols BTC,ETH --channels trades --no-auth
-          connector --exchange hl --symbols SOL --channels trades,candles --raw
+          connector --exchange hl --symbols BTC,ETH --channels trades --no-auth
+          connector --exchange hl --symbols SOL --channels trades,candles,l1 --no-auth --raw
+          connector --exchange hl --symbols BTC --channels allmids --no-auth
         """);
 }

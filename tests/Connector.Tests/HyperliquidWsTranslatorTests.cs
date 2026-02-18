@@ -335,6 +335,213 @@ public class HyperliquidWsTranslatorTests
         Assert.Contains("trades", events[0].Raw!.RawJson!);
     }
 
+    // --- New channel tests ---
+
+    [Fact]
+    public void Parse_Bbo_ReturnsOrderBookL1Event()
+    {
+        var json = """
+        {
+          "channel": "bbo",
+          "data": {
+            "coin": "BTC",
+            "bid": {"px": "50000.00", "sz": "5.0"},
+            "ask": {"px": "50001.00", "sz": "3.0"}
+          }
+        }
+        """;
+
+        var events = Parse(json);
+        Assert.Single(events);
+        var ob = Assert.IsType<OrderBookL1Event>(events[0]);
+        Assert.Equal("BTC", ob.Symbol);
+        Assert.Equal(50000.00m, ob.BestBid.Price);
+        Assert.Equal(50001.00m, ob.BestAsk.Price);
+    }
+
+    [Fact]
+    public void Parse_AllMids_ReturnsAllMidsEvent()
+    {
+        var json = """
+        {
+          "channel": "allMids",
+          "data": {
+            "mids": {
+              "BTC": "50000.5",
+              "ETH": "3000.1"
+            }
+          }
+        }
+        """;
+
+        var events = Parse(json);
+        Assert.Single(events);
+        var am = Assert.IsType<AllMidsEvent>(events[0]);
+        Assert.Equal("*", am.Symbol);
+        Assert.Equal(2, am.Mids.Length);
+        Assert.Contains(am.Mids, m => m.Symbol == "BTC" && m.Mid == 50000.5m);
+        Assert.Contains(am.Mids, m => m.Symbol == "ETH" && m.Mid == 3000.1m);
+    }
+
+    [Fact]
+    public void Parse_ActiveAssetCtx_ReturnsActiveAssetCtxEvent()
+    {
+        var json = """
+        {
+          "channel": "activeAssetCtx",
+          "data": {
+            "coin": "BTC",
+            "ctx": {
+              "funding": "0.0001",
+              "markPx": "50000.0",
+              "openInterest": "1234.5",
+              "oraclePx": "49999.0",
+              "prevDayPx": "49500.0"
+            }
+          }
+        }
+        """;
+
+        var events = Parse(json);
+        Assert.Single(events);
+        var ctx = Assert.IsType<ActiveAssetCtxEvent>(events[0]);
+        Assert.Equal("BTC", ctx.Symbol);
+        Assert.Equal(0.0001m, ctx.FundingRate);
+        Assert.Equal(50000.0m, ctx.MarkPrice);
+        Assert.Equal(1234.5m, ctx.OpenInterest);
+        Assert.Equal(49999.0m, ctx.OraclePrice);
+    }
+
+    [Fact]
+    public void Parse_ClearinghouseState_ReturnsPositionAndBalanceEvents()
+    {
+        var json = """
+        {
+          "channel": "clearinghouseState",
+          "data": {
+            "assetPositions": [
+              {
+                "position": {
+                  "coin": "BTC",
+                  "szi": "1.5",
+                  "entryPx": "50000.0",
+                  "unrealizedPnl": "500.0"
+                }
+              }
+            ],
+            "crossMarginSummary": {
+              "accountValue": "100000.0",
+              "totalMarginUsed": "25000.0",
+              "totalRawUsd": "75000.0"
+            },
+            "withdrawable": "70000.0"
+          }
+        }
+        """;
+
+        var events = Parse(json);
+        Assert.Equal(2, events.Count);
+
+        var pos = Assert.IsType<PositionEvent>(events[0]);
+        Assert.Single(pos.Positions);
+        Assert.Equal("BTC", pos.Positions[0].Symbol);
+        Assert.Equal("long", pos.Positions[0].Side);
+        Assert.Equal(1.5m, pos.Positions[0].Size);
+
+        var bal = Assert.IsType<BalanceEvent>(events[1]);
+        Assert.Equal(100000.0m, bal.AccountValue);
+        Assert.Equal(70000.0m, bal.Withdrawable);
+    }
+
+    [Fact]
+    public void Parse_OpenOrders_ReturnsOpenOrdersEvent()
+    {
+        var json = """
+        {
+          "channel": "openOrders",
+          "data": [
+            {
+              "coin": "ETH",
+              "side": "B",
+              "limitPx": "3000.00",
+              "sz": "2.0",
+              "oid": 555,
+              "timestamp": 1704067200000
+            }
+          ]
+        }
+        """;
+
+        var events = Parse(json);
+        Assert.Single(events);
+        var oo = Assert.IsType<OpenOrdersEvent>(events[0]);
+        Assert.Single(oo.Orders);
+        Assert.Equal("555", oo.Orders[0].OrderId);
+        Assert.Equal("ETH", oo.Orders[0].Symbol);
+    }
+
+    [Fact]
+    public void Parse_Notification_ReturnsNotificationEvent()
+    {
+        var json = """{"channel":"notification","data":"Order filled at 50000"}""";
+
+        var events = Parse(json);
+        Assert.Single(events);
+        var n = Assert.IsType<NotificationEvent>(events[0]);
+        Assert.Equal("Order filled at 50000", n.Message);
+    }
+
+    [Fact]
+    public void Subscribe_Bbo_ProducesCorrectJson()
+    {
+        var req = new UnifiedWsSubscribeRequest
+        {
+            CorrelationId = "c1",
+            Exchange = UnifiedExchange.Hyperliquid,
+            Channel = UnifiedWsChannel.OrderBookL1,
+            Symbols = ["BTC"]
+        };
+
+        var messages = _translator.ToExchangeSubscribe(req).ToList();
+        Assert.Single(messages);
+        Assert.Contains("\"type\":\"bbo\"", messages[0].Payload);
+        Assert.Contains("\"coin\":\"BTC\"", messages[0].Payload);
+    }
+
+    [Fact]
+    public void Subscribe_AllMids_SingleMessageRegardlessOfSymbols()
+    {
+        var req = new UnifiedWsSubscribeRequest
+        {
+            CorrelationId = "c1",
+            Exchange = UnifiedExchange.Hyperliquid,
+            Channel = UnifiedWsChannel.AllMids,
+            Symbols = ["BTC", "ETH"]
+        };
+
+        var messages = _translator.ToExchangeSubscribe(req).ToList();
+        // AllMids is per-symbol in our mapping, so 2 messages
+        Assert.Equal(2, messages.Count);
+        Assert.Contains("\"type\":\"allMids\"", messages[0].Payload);
+    }
+
+    [Fact]
+    public void Subscribe_Positions_UsesUserAddress()
+    {
+        var req = new UnifiedWsSubscribeRequest
+        {
+            CorrelationId = "c1",
+            Exchange = UnifiedExchange.Hyperliquid,
+            Channel = UnifiedWsChannel.Positions,
+            Symbols = ["BTC"]
+        };
+
+        var messages = _translator.ToExchangeSubscribe(req).ToList();
+        Assert.Single(messages);
+        Assert.Contains("\"type\":\"clearinghouseState\"", messages[0].Payload);
+        Assert.Contains("\"user\":\"0xTestUser\"", messages[0].Payload);
+    }
+
     private List<UnifiedWsEvent> Parse(string json)
     {
         var inbound = new TransportWsInbound

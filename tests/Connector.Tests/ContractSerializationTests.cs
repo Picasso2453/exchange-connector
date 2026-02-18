@@ -314,8 +314,7 @@ public class ContractSerializationTests
         {
             Exchange = UnifiedExchange.Hyperliquid,
             Symbol = "BTC",
-            Interval = "1h",
-            Limit = 100
+            Interval = "1h"
         };
 
         Assert.False(req.AuthRequired);
