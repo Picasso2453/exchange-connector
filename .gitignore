@@ -12,3 +12,4 @@ artifacts/
 codex/
 tests/
 .agent/
+example_commands.txt
