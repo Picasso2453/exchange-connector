@@ -8,6 +8,7 @@ artifacts/
 .env.*
 *.key
 *.pem
-.plandex-v2
+.plandex-v2/
 codex/
 tests/
+.agent/
