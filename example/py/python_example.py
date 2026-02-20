@@ -226,11 +226,56 @@ def main():
     deadline_ms = 10000
     start = __import__("time").time()
 
+    def _fmt_event(evt):
+        # Best-effort pretty print for common event shapes.
+        try:
+            channel = str(evt.Channel)
+        except Exception:
+            channel = "unknown"
+
+        try:
+            symbol = getattr(evt, "Symbol", None)
+        except Exception:
+            symbol = None
+
+        if channel == "Trades":
+            trades = getattr(evt, "Trades", None)
+            if trades:
+                t = trades[0]
+                return f"{channel} {symbol} px={t.Price} sz={t.Size} side={t.Side}"
+        elif channel == "OrderBookL2":
+            bids = getattr(evt, "Bids", None)
+            asks = getattr(evt, "Asks", None)
+            if bids and asks:
+                return f"{channel} {symbol} bid={bids[0].Price}@{bids[0].Size} ask={asks[0].Price}@{asks[0].Size}"
+        elif channel == "OrderBookL1":
+            bb = getattr(evt, "BestBid", None)
+            ba = getattr(evt, "BestAsk", None)
+            if bb and ba:
+                return f"{channel} {symbol} bid={bb.Price}@{bb.Size} ask={ba.Price}@{ba.Size}"
+        elif channel == "Candles":
+            candle = getattr(evt, "Candle", None)
+            if candle:
+                return f"{channel} {symbol} o={candle.Open} h={candle.High} l={candle.Low} c={candle.Close} v={candle.Volume}"
+        elif channel == "AllMids":
+            mids = getattr(evt, "Mids", None)
+            if mids:
+                m = mids[0]
+                return f"{channel} {m.Symbol} mid={m.Mid}"
+        elif channel == "ActiveAssetCtx":
+            mp = getattr(evt, "MarkPrice", None)
+            fr = getattr(evt, "FundingRate", None)
+            oi = getattr(evt, "OpenInterest", None)
+            return f"{channel} {symbol} mark={mp} funding={fr} oi={oi}"
+
+        # Fallback: type + symbol
+        return f"{channel} {symbol}"
+
     # Read until we see at least one event per stream (or timeout).
     while len(seen) < len(streams) and (time := __import__("time").time() - start) * 1000 < deadline_ms:
         evt = reader.ReadAsync(cts.Token).AsTask().Result
         seen.add(str(evt.Channel))
-        print(f"{evt.Channel} -> {evt.Symbol}")
+        print(_fmt_event(evt))
 
     # --- REST: place a market buy and a limit sell ---
     # NOTE: Trading endpoints and EIP-712 signing are not yet implemented in
