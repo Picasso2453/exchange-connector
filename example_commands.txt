@@ -1,11 +1,23 @@
-L2 Orderbook (SOL):
+# Trades
+dotnet run --project src/Connector.Cli -- --exchange hl --symbols BTC --channels trades --no-auth
+
+# L2 book
 dotnet run --project src/Connector.Cli -- --exchange hl --symbols SOL --channels l2 --no-auth
 
-Candles (BTC, 1m interval):
+# Candles
 dotnet run --project src/Connector.Cli -- --exchange hl --symbols BTC --channels candles --no-auth
 
-Both together (BTC + ETH, trades + L2 + candles):
-dotnet run --project src/Connector.Cli -- --exchange hl --symbols BTC,ETH --channels trades,l2,candles --no-auth
+# Best bid/offer (L1)
+dotnet run --project src/Connector.Cli -- --exchange hl --symbols BTC --channels l1 --no-auth
 
-With raw exchange payloads included:
-dotnet run --project src/Connector.Cli -- --exchange hl --symbols SOL --channels l2,candles --no-auth --raw
+# All mid prices
+dotnet run --project src/Connector.Cli -- --exchange hl --symbols BTC --channels allmids --no-auth
+
+# Asset context (funding, markPx, OI)
+dotnet run --project src/Connector.Cli -- --exchange hl --symbols BTC --channels assetctx --no-auth
+
+# Multi-channel
+dotnet run --project src/Connector.Cli -- --exchange hl --symbols BTC,ETH --channels trades,l1,candles --no-auth
+
+# With raw payloads
+dotnet run --project src/Connector.Cli -- --exchange hl --symbols BTC --channels trades,assetctx --no-auth --raw
